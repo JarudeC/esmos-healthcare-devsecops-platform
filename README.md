@@ -14,10 +14,10 @@ GitHub Actions (CI/CD)
                           │
                           ├── GKE Cluster (1-2 nodes, e2-medium, private)
                           ├── Cloud SQL PostgreSQL (private IP, daily backups)
-                          ├── VPC (subnets: gke, db + private service access)
+                          ├── VPC (subnets: gke, db, ingress + private service access)
                           ├── ArgoCD (GitOps controller)
-                          │     ├── Syncs → Odoo + Helpdesk (Bitnami Helm)
-                          │     └── Syncs → Moodle (Bitnami Helm, IP-whitelisted)
+                          │     ├── Syncs → Odoo (Bitnami Helm)
+                          │     └── Syncs → Moodle (Bitnami Helm)
                           └── Prometheus + Grafana (live monitoring)
 ```
 
@@ -82,11 +82,10 @@ GitHub Actions (CI/CD)
 │  │  │  ALLOW  all internal traffic from 10.0.0.0/8         (pri 900)│   │    │
 │  │  └───────────────────────────────────────────────────────────────┘   │    │
 │  │                                                                      │    │
-│  │  ┌─── Ingress (defined in Helm values, no Ingress Controller) ────┐  │    │
-│  │  │  Odoo:   odoo.esmos-healthcare.local   (ClusterIP + ingress)   │  │    │
-│  │  │  Moodle: moodle.esmos-healthcare.local (ClusterIP + ingress)   │  │    │
-│  │  │  Moodle IP whitelist: 116.87.48.126/32                         │  │    │
-│  │  │  Access method: kubectl port-forward (no public endpoint)      │  │    │
+│  │  ┌─── Access (No public endpoint) ────────────────────────────────┐  │    │
+│  │  │  All services use ClusterIP (internal only)                    │  │    │
+│  │  │  Access method: kubectl port-forward from authorized machine   │  │    │
+│  │  │  Moodle IP whitelist: 116.87.48.126/32 (ingress annotation)    │  │    │
 │  │  └────────────────────────────────────────────────────────────────┘  │    │
 │  └──────────────────────────────────────────────────────────────────────┘    │
 │                                                                              │
@@ -140,7 +139,7 @@ Node 1              Node 1                          Node 1              Node 2
 │   └── helm.tf                           # ArgoCD, Prometheus/Grafana, App CRDs
 └── kubernetes/
     ├── odoo/
-    │   ├── values.yaml                   # Odoo + Helpdesk configuration
+    │   ├── values.yaml                   # Odoo configuration
     │   └── argocd-odoo-app.yaml          # ArgoCD Application CRD for Odoo
     └── moodle/
         ├── values.yaml                   # Moodle configuration (IP-whitelisted)
@@ -156,7 +155,7 @@ Node 1              Node 1                          Node 1              Node 2
 | System | Purpose | Users | Access |
 |--------|---------|-------|--------|
 | **Odoo** | Meal plan inventory & operations | Operations staff (post-training) | Internal, authenticated |
-| **Odoo Helpdesk** | Centralized support across Odoo & Moodle | Support managers, all staff | Internal, role-based |
+| **Helpdesk** (Odoo app or alternative) | Centralized support across Odoo & Moodle | Support managers, all staff | Internal, role-based |
 | **Moodle** | Mandatory compliance training (500+ staff) | All healthcare staff | Internal only, IP-whitelisted |
 | **Grafana** | Live monitoring dashboard | SRE / operations team | Internal, port-forwarded |
 
@@ -254,14 +253,22 @@ To follow the RFC workflow:
 2. Open a Pull Request — GitHub Actions runs `terraform plan` (RFC review)
 3. Review the plan, then merge — GitHub Actions runs `terraform apply`
 
-### Step 5: Verify
+### Step 5: Verify and configure
 
 After the pipeline completes:
 
 ```bash
+# Get cluster credentials
 gcloud container clusters get-credentials esmos-healthcare-gke --zone asia-southeast1-a
-kubectl get applications -n argocd
+
+# Check all pods and ArgoCD apps
 kubectl get pods -A
+kubectl get applications -n argocd
+
+# Get Cloud SQL private IP and update Odoo config
+gcloud sql instances describe esmos-healthcare-postgres --format="value(ipAddresses[0].ipAddress)"
+# Copy the IP, then update kubernetes/odoo/values.yaml → externalDatabase.host with this IP
+# Push the change — ArgoCD will auto-sync Odoo with the correct DB connection
 ```
 
 ### Step 6: Access services
@@ -284,7 +291,15 @@ kubectl port-forward svc/moodle -n moodle 8080:8080
 # → http://localhost:8080
 ```
 
-### Step 7: Set up Odoo Helpdesk
+### Step 7: Enable Moodle backup CronJob
+
+```bash
+kubectl apply -f kubernetes/moodle/backup-cronjob.yaml
+```
+
+This creates a daily backup job that dumps MariaDB to the GCS bucket at 2am SGT.
+
+### Step 8: Set up Odoo Helpdesk
 
 > Note: Bitnami's community Odoo does not include the Helpdesk module (Enterprise only).
 > Use the built-in **Helpdesk** alternative or install a free helpdesk app from the Odoo App Store.
@@ -355,7 +370,7 @@ You can also teardown from GitHub without the CLI:
 | **Data residency** | All resources in `asia-southeast1` (Singapore) |
 | **Network isolation** | GKE private nodes, firewall deny-all internet inbound |
 | **Database security** | Cloud SQL private IP only, no public access |
-| **Access control** | Moodle IP-whitelisted, Odoo access requires training completion |
+| **Access control** | No public endpoints; access via `kubectl port-forward`. Moodle IP-whitelisted (116.87.48.126/32). Odoo access requires training completion |
 | **Least privilege** | All containers run as non-root (UID 1001), pod security contexts enforced |
 | **CI/CD auth** | Workload Identity Federation — no stored credentials, OIDC-based |
 | **Backups** | Cloud SQL daily (Odoo), CronJob daily to GCS (Moodle), 7-day retention |
@@ -386,6 +401,6 @@ Rollback: Revert the git commit → ArgoCD auto-syncs to previous state.
 | Node size | `terraform/gke.tf` | `e2-medium` (2 vCPU, 4GB) |
 | Node count | `terraform/gke.tf` | 1-2 (autoscaling) |
 | Moodle replicas | `kubernetes/moodle/values.yaml` | 1 (HPA scales to 3) |
-| Moodle allowed IPs | `kubernetes/moodle/values.yaml` | `116.87.48.126/32` (replace with your IP) |
+| Moodle allowed IPs | `kubernetes/moodle/values.yaml` | `116.87.48.126/32` (your IP) |
 | Grafana password | `terraform/helm.tf` | `esmos-admin` |
 | Backup schedule | `kubernetes/moodle/backup-cronjob.yaml` | Daily at 2am |

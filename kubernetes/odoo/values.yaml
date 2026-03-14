@@ -51,6 +51,9 @@ service:
     http: 8069
 
 ## ---------- Ingress ----------
+# SecOps: Ingress config defines the intended access pattern.
+# Current access: kubectl port-forward (private cluster, no public endpoint).
+# If an NGINX Ingress Controller is deployed, Odoo will be accessible via hostname.
 ingress:
   enabled: true
   ingressClassName: nginx

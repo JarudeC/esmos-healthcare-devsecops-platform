@@ -73,6 +73,10 @@ service:
     https: 8443
 
 ## ---------- Ingress (Internal Only with IP Whitelisting) ----------
+# SecOps: Even without an Ingress Controller, these annotations define the
+# intended network policy. If an NGINX Ingress Controller is deployed, Moodle
+# will automatically be IP-restricted to authorized networks only.
+# Current access: kubectl port-forward (private cluster, no public endpoint).
 ingress:
   enabled: true
   ingressClassName: nginx
