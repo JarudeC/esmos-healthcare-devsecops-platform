@@ -1,0 +1,77 @@
+# Bitnami Odoo Helm Chart - values.yaml
+# Chart: oci://registry-1.docker.io/bitnamicharts/odoo
+
+## ---------- Odoo Application ----------
+odooEmail: admin@esmos-healthcare.local
+odooPassword: ""  # Set via --set at deploy time
+
+## ---------- External PostgreSQL (Cloud SQL) ----------
+postgresql:
+  enabled: false  # Disable the bundled PostgreSQL sub-chart
+
+externalDatabase:
+  host: ""        # Auto-populated by Cloud SQL private IP
+  port: 5432
+  user: "odooadmin"
+  password: ""    # Set via Kubernetes Secret or --set
+  database: "odoo"
+
+## ---------- Odoo Modules ----------
+# Enable Helpdesk module for ITIL Service Operation
+odooSkipInstall: false
+customPostInitScripts:
+  enable-helpdesk.sh: |
+    #!/bin/bash
+    # Helpdesk module is installed via Odoo UI on first login:
+    # Apps → Search "Helpdesk" → Install
+    echo "Odoo ready. Enable Helpdesk module via Apps menu."
+
+## ---------- Replicas ----------
+replicaCount: 1
+
+## ---------- Resources (Budget-friendly for e2-medium nodes) ----------
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+
+## ---------- Persistence ----------
+persistence:
+  enabled: true
+  size: 8Gi
+  storageClass: "standard-rwo"
+
+## ---------- Service ----------
+service:
+  type: ClusterIP
+  ports:
+    http: 8069
+
+## ---------- Ingress ----------
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hostname: odoo.esmos-healthcare.local
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  tls: true
+
+## ---------- Pod Security ----------
+podSecurityContext:
+  fsGroup: 1001
+containerSecurityContext:
+  runAsUser: 1001
+  runAsNonRoot: true
+
+## ---------- Health Checks ----------
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  periodSeconds: 30
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10

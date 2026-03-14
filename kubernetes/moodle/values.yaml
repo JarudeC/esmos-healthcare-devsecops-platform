@@ -1,0 +1,98 @@
+# Bitnami Moodle Helm Chart - values.yaml
+# Chart: oci://registry-1.docker.io/bitnamicharts/moodle
+
+## ---------- Moodle Application ----------
+moodleUsername: admin
+moodlePassword: ""  # Set via --set at deploy time
+moodleEmail: admin@esmos-healthcare.local
+moodleSiteName: "ESMOS Healthcare LMS"
+
+## ---------- Database (bundled MariaDB) ----------
+mariadb:
+  enabled: true
+  auth:
+    rootPassword: ""     # Set via Kubernetes Secret or --set
+    database: moodle
+    username: moodle
+    password: ""         # Set via Kubernetes Secret or --set
+  primary:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 250m
+        memory: 512Mi
+    persistence:
+      enabled: true
+      size: 8Gi
+      storageClass: "standard-rwo"
+
+## ---------- Replicas ----------
+# Start with 1 to save credits; HPA scales up under load (cost-effective HA)
+replicaCount: 1
+
+## ---------- Resources (Budget-friendly for e2-medium nodes) ----------
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+
+## ---------- Autoscaling (Phase 3 change demo: load test → watch it scale) ----------
+# Cost-effective HA: 1 pod at rest, scales to 3 under load for training days
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPU: 70
+  targetMemory: 80
+
+## ---------- Pod Disruption Budget (ensures uptime during updates) ----------
+pdb:
+  create: true
+  minAvailable: 1
+
+## ---------- Persistence ----------
+persistence:
+  enabled: true
+  size: 8Gi
+  storageClass: "standard-rwo"
+
+## ---------- Service (Internal Only) ----------
+service:
+  type: ClusterIP
+  ports:
+    http: 8080
+    https: 8443
+
+## ---------- Ingress (Internal Only with IP Whitelisting) ----------
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hostname: moodle.esmos-healthcare.local
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # SecOps: IP Whitelisting — restrict access to authorised networks only
+    nginx.ingress.kubernetes.io/whitelist-source-range: "1.2.3.4/32"
+    nginx.ingress.kubernetes.io/service-upstream: "true"
+  tls: true
+
+## ---------- Pod Security ----------
+podSecurityContext:
+  fsGroup: 1001
+containerSecurityContext:
+  runAsUser: 1001
+  runAsNonRoot: true
+
+## ---------- Health Checks ----------
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  periodSeconds: 30
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10

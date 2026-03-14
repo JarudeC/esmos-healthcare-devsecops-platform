@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: moodle-mariadb-backup
+  namespace: moodle
+spec:
+  schedule: "0 2 * * *"  # Daily at 2am SGT
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: backup
+              image: google/cloud-sdk:slim
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  apt-get update && apt-get install -y mariadb-client
+                  TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+                  BACKUP_FILE="/tmp/moodle-backup-${TIMESTAMP}.sql"
+                  echo "Starting Moodle MariaDB backup..."
+                  mysqldump -h moodle-mariadb -u moodle -p"${MARIADB_PASSWORD}" moodle > "$BACKUP_FILE"
+                  gcloud storage cp "$BACKUP_FILE" "gs://${BUCKET_NAME}/moodle-backups/moodle-backup-${TIMESTAMP}.sql"
+                  echo "Backup uploaded to gs://${BUCKET_NAME}/moodle-backups/moodle-backup-${TIMESTAMP}.sql"
+                  # Clean up backups older than 7 days
+                  gcloud storage ls "gs://${BUCKET_NAME}/moodle-backups/" | while read -r file; do
+                    FILE_DATE=$(echo "$file" | grep -oP '\d{8}')
+                    if [ -n "$FILE_DATE" ]; then
+                      CUTOFF=$(date -d "7 days ago" +%Y%m%d)
+                      if [ "$FILE_DATE" -lt "$CUTOFF" ] 2>/dev/null; then
+                        gcloud storage rm "$file"
+                      fi
+                    fi
+                  done
+              env:
+                - name: MARIADB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: moodle-mariadb
+                      key: mariadb-password
+                - name: BUCKET_NAME
+                  value: "esmos-healthcare-tfstate"
+          restartPolicy: OnFailure
+          serviceAccountName: moodle-backup-sa

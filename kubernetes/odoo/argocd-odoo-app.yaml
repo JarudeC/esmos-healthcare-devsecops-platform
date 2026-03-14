@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: odoo
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    chart: odoo
+    repoURL: oci://registry-1.docker.io/bitnamicharts
+    targetRevision: "*"
+    helm:
+      valueFiles:
+        - values.yaml
+      # Override values from the Git repo
+      values: |
+        # Values are loaded from kubernetes/odoo/values.yaml in the Git source below
+
+  # Use a multi-source approach: Helm chart + Git repo for values
+  sources:
+    - chart: odoo
+      repoURL: oci://registry-1.docker.io/bitnamicharts
+      targetRevision: "*"
+      helm:
+        valueFiles:
+          - $values/kubernetes/odoo/values.yaml
+    - repoURL: https://github.com/YOUR_ORG/esmos-healthcare-devsecops-platform.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: odoo
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
