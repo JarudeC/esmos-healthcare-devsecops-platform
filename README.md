@@ -40,7 +40,7 @@ GitHub Actions (CI/CD)
 │  │  │  NGINX Ingress Controller                                          │   │   │
 │  │  │  ├── odoo.esmos-healthcare.local    → routes to Odoo pods          │   │   │
 │  │  │  └── moodle.esmos-healthcare.local  → routes to Moodle pods        │   │   │
-│  │  │      (IP whitelist: 1.2.3.4/32)       (internal access only)       │   │   │
+│  │  │      (IP whitelist: 116.87.48.126/32)       (internal access only)       │   │   │
 │  │  └────────────────────────────────────────────────────────────────────┘   │   │
 │  │         │                                                                 │   │
 │  │         ▼                                                                 │   │
@@ -54,8 +54,8 @@ GitHub Actions (CI/CD)
 │  │  │  │  │  (1 replica) │  │  (1 replica) │  │  (HPA scaled)    │   │   │   │   │
 │  │  │  │  │  Port: 8069  │  │  Port: 8080  │  │  (when CPU >70%) │   │   │   │   │
 │  │  │  │  └──────┬───────┘  └──────┬───────┘  └──────────────────┘   │   │   │   │
-│  │  │  │         │                  │                                │   │   │   │
-│  │  │  │  ┌──────┴──────────────────┴──────────────────────────────┐ │   │   │   │
+│  │  │  │         │                 │                                 │   │   │   │
+│  │  │  │  ┌──────┴─────────────────┴───────────────────────────────┐ │   │   │   │
 │  │  │  │  │  MariaDB Pod (Moodle DB) ── backed up daily to GCS     │ │   │   │   │
 │  │  │  │  └────────────────────────────────────────────────────────┘ │   │   │   │
 │  │  │  │                                                             │   │   │   │
@@ -382,6 +382,6 @@ Rollback: Revert the git commit → ArgoCD auto-syncs to previous state.
 | Node size | `terraform/gke.tf` | `e2-medium` (2 vCPU, 4GB) |
 | Node count | `terraform/gke.tf` | 1-2 (autoscaling) |
 | Moodle replicas | `kubernetes/moodle/values.yaml` | 1 (HPA scales to 3) |
-| Moodle allowed IPs | `kubernetes/moodle/values.yaml` | `1.2.3.4/32` (replace with your IP) |
+| Moodle allowed IPs | `kubernetes/moodle/values.yaml` | `116.87.48.126/32` (replace with your IP) |
 | Grafana password | `terraform/helm.tf` | `esmos-admin` |
 | Backup schedule | `kubernetes/moodle/backup-cronjob.yaml` | Daily at 2am |

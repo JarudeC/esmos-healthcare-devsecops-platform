@@ -8,13 +8,17 @@ moodleEmail: admin@esmos-healthcare.local
 moodleSiteName: "ESMOS Healthcare LMS"
 
 ## ---------- Database (bundled MariaDB) ----------
+# NOTE: Passwords are inline for simplicity in this academic project.
+# In production, use Kubernetes Secrets + mariadb.auth.existingSecret to avoid
+# storing credentials in version control. The cluster is private (no public
+# ingress to DB) so exposure risk is minimal here.
 mariadb:
   enabled: true
   auth:
-    rootPassword: ""     # Set via Kubernetes Secret or --set
+    rootPassword: "esmos-mariadb-root"
     database: moodle
     username: moodle
-    password: ""         # Set via Kubernetes Secret or --set
+    password: "esmos-moodle-db"
   primary:
     resources:
       requests:
@@ -76,7 +80,7 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     # SecOps: IP Whitelisting — restrict access to authorised networks only
-    nginx.ingress.kubernetes.io/whitelist-source-range: "1.2.3.4/32"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "116.87.48.126/32"
     nginx.ingress.kubernetes.io/service-upstream: "true"
   tls: true
 
