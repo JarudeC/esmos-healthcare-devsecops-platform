@@ -90,7 +90,9 @@ resource "helm_release" "prometheus_stack" {
   namespace        = "monitoring"
   create_namespace = true
   wait             = false
-  timeout          = 900
+  timeout          = 1200
+  skip_crds        = true
+  disable_webhooks = true
 
   # Budget-friendly: reduce resource usage
   set {
