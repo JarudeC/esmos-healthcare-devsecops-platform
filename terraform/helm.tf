@@ -80,15 +80,6 @@ resource "helm_release" "argocd" {
 }
 
 # ─────────────────────────────────────────────────
-# ArgoCD Application CRDs - Odoo & Moodle
-# ─────────────────────────────────────────────────
-provider "kubernetes" {
-  host                   = "https://${google_container_cluster.main.endpoint}"
-  token                  = data.google_client_config.default.access_token
-  cluster_ca_certificate = base64decode(google_container_cluster.main.master_auth[0].cluster_ca_certificate)
-}
-
-# ─────────────────────────────────────────────────
 # Prometheus + Grafana - Monitoring Stack
 # ─────────────────────────────────────────────────
 resource "helm_release" "prometheus_stack" {
@@ -160,97 +151,20 @@ resource "helm_release" "prometheus_stack" {
   }
 }
 
-variable "github_repo" {
-  description = "GitHub repository URL for ArgoCD to sync from"
-  default     = "https://github.com/JarudeC/esmos-healthcare-devsecops-platform"
-}
-
-resource "kubernetes_manifest" "argocd_odoo" {
+# ─────────────────────────────────────────────────
+# ArgoCD Application CRDs - applied via kubectl
+# (kubernetes_manifest fails at plan time when cluster doesn't exist yet)
+# ─────────────────────────────────────────────────
+resource "null_resource" "argocd_apps" {
   depends_on = [helm_release.argocd]
 
-  manifest = {
-    apiVersion = "argoproj.io/v1alpha1"
-    kind       = "Application"
-    metadata = {
-      name      = "odoo"
-      namespace = "argocd"
-    }
-    spec = {
-      project = "default"
-      sources = [
-        {
-          chart          = "odoo"
-          repoURL        = "oci://registry-1.docker.io/bitnamicharts"
-          targetRevision = "*"
-          helm = {
-            valueFiles = ["$values/kubernetes/odoo/values.yaml"]
-          }
-        },
-        {
-          repoURL        = var.github_repo
-          targetRevision = "main"
-          ref            = "values"
-        }
-      ]
-      destination = {
-        server    = "https://kubernetes.default.svc"
-        namespace = "odoo"
-      }
-      syncPolicy = {
-        automated = {
-          prune    = true
-          selfHeal = true
-        }
-        syncOptions = [
-          "CreateNamespace=true",
-          "ServerSideApply=true"
-        ]
-      }
-    }
-  }
-}
-
-resource "kubernetes_manifest" "argocd_moodle" {
-  depends_on = [helm_release.argocd]
-
-  manifest = {
-    apiVersion = "argoproj.io/v1alpha1"
-    kind       = "Application"
-    metadata = {
-      name      = "moodle"
-      namespace = "argocd"
-    }
-    spec = {
-      project = "default"
-      sources = [
-        {
-          chart          = "moodle"
-          repoURL        = "oci://registry-1.docker.io/bitnamicharts"
-          targetRevision = "*"
-          helm = {
-            valueFiles = ["$values/kubernetes/moodle/values.yaml"]
-          }
-        },
-        {
-          repoURL        = var.github_repo
-          targetRevision = "main"
-          ref            = "values"
-        }
-      ]
-      destination = {
-        server    = "https://kubernetes.default.svc"
-        namespace = "moodle"
-      }
-      syncPolicy = {
-        automated = {
-          prune    = true
-          selfHeal = true
-        }
-        syncOptions = [
-          "CreateNamespace=true",
-          "ServerSideApply=true"
-        ]
-      }
-    }
+  provisioner "local-exec" {
+    command = <<-EOT
+      gcloud container clusters get-credentials ${google_container_cluster.main.name} \
+        --zone ${google_container_cluster.main.location} \
+        --project ${var.project_id}
+      kubectl apply -f ${path.module}/../kubernetes/odoo/argocd-odoo-app.yaml
+      kubectl apply -f ${path.module}/../kubernetes/moodle/argocd-moodle-app.yaml
+    EOT
   }
 }

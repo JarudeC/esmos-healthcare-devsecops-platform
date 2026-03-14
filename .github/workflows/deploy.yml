@@ -108,6 +108,11 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
+      - name: Setup gcloud + kubectl
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: "gke-gcloud-auth-plugin,kubectl"
+
       - name: Terraform Init
         working-directory: terraform
         run: terraform init
@@ -115,6 +120,8 @@ jobs:
       - name: Terraform Apply
         working-directory: terraform
         run: terraform apply -auto-approve
+        env:
+          USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
 
   # ───────────────────────────────────────────────
   # Destroy Phase: Manual trigger only
@@ -138,6 +145,11 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud + kubectl
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: "gke-gcloud-auth-plugin,kubectl"
 
       - name: Terraform Init
         working-directory: terraform

@@ -8,18 +8,6 @@ metadata:
 spec:
   project: default
 
-  source:
-    chart: odoo
-    repoURL: oci://registry-1.docker.io/bitnamicharts
-    targetRevision: "*"
-    helm:
-      valueFiles:
-        - values.yaml
-      # Override values from the Git repo
-      values: |
-        # Values are loaded from kubernetes/odoo/values.yaml in the Git source below
-
-  # Use a multi-source approach: Helm chart + Git repo for values
   sources:
     - chart: odoo
       repoURL: oci://registry-1.docker.io/bitnamicharts
@@ -27,7 +15,7 @@ spec:
       helm:
         valueFiles:
           - $values/kubernetes/odoo/values.yaml
-    - repoURL: https://github.com/YOUR_ORG/esmos-healthcare-devsecops-platform.git
+    - repoURL: https://github.com/JarudeC/esmos-healthcare-devsecops-platform.git
       targetRevision: main
       ref: values
 

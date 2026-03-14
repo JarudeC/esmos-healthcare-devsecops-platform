@@ -33,9 +33,12 @@ GitHub Actions (CI/CD)
 │   ├── db.tf                             # Cloud SQL for PostgreSQL
 │   └── helm.tf                           # ArgoCD, Prometheus/Grafana, App CRDs
 └── kubernetes/
-    ├── odoo/values.yaml                  # Odoo + Helpdesk configuration
+    ├── odoo/
+    │   ├── values.yaml                   # Odoo + Helpdesk configuration
+    │   └── argocd-odoo-app.yaml          # ArgoCD Application CRD for Odoo
     └── moodle/
         ├── values.yaml                   # Moodle configuration (IP-whitelisted)
+        ├── argocd-moodle-app.yaml        # ArgoCD Application CRD for Moodle
         ├── backup-cronjob.yaml           # Daily MariaDB backup to GCS
         └── restore.sh                    # Restore from backup
 ```
