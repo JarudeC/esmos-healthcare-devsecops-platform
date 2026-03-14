@@ -4,6 +4,8 @@ A Service Management platform for Healthcare, deploying **Odoo** (ERP/Operations
 
 ## Architecture
 
+### CI/CD Flow
+
 ```
 GitHub Actions (CI/CD)
     │
@@ -17,6 +19,109 @@ GitHub Actions (CI/CD)
                           │     ├── Syncs → Odoo + Helpdesk (Bitnami Helm)
                           │     └── Syncs → Moodle (Bitnami Helm, IP-whitelisted)
                           └── Prometheus + Grafana (live monitoring)
+```
+
+### Infrastructure Diagram
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│  GCP Project: esmos-healthcare             Region: asia-southeast1 (Singapore)   │
+│                                                                                  │
+│  ┌─── GCS Bucket ────────────────────────────────────────────────────────────┐   │
+│  │  gs://esmos-healthcare-tfstate                                            │   │
+│  │  ├── terraform/state/    (Terraform state)                                │   │
+│  │  └── moodle-backups/     (Daily MariaDB dumps, 7-day retention)           │   │
+│  └───────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                  │
+│  ┌─── VPC: esmos-healthcare-vpc (10.0.0.0/16) ───────────────────────────────┐   │
+│  │                                                                           │   │
+│  │  ┌─── ingress-subnet (10.0.3.0/24) ── PUBLIC-FACING ──────────────────┐   │   │
+│  │  │                                                                    │   │   │
+│  │  │  NGINX Ingress Controller                                          │   │   │
+│  │  │  ├── odoo.esmos-healthcare.local    → routes to Odoo pods          │   │   │
+│  │  │  └── moodle.esmos-healthcare.local  → routes to Moodle pods        │   │   │
+│  │  │      (IP whitelist: 1.2.3.4/32)       (internal access only)       │   │   │
+│  │  └────────────────────────────────────────────────────────────────────┘   │   │
+│  │         │                                                                 │   │
+│  │         ▼                                                                 │   │
+│  │  ┌─── gke-subnet (10.0.1.0/24) ── PRIVATE ────────────────────────────┐   │   │
+│  │  │  Pods: 10.10.0.0/16    Services: 10.20.0.0/16                      │   │   │
+│  │  │                                                                    │   │   │
+│  │  │  ┌─── GKE Node 1 (e2-medium: 2 vCPU, 4GB) ── No Public IP ─────┐   │   │   │
+│  │  │  │                                                             │   │   │   │
+│  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │   │   │   │
+│  │  │  │  │  Odoo Pod    │  │  Moodle Pod  │  │  Moodle Pod #2   │   │   │   │   │
+│  │  │  │  │  (1 replica) │  │  (1 replica) │  │  (HPA scaled)    │   │   │   │   │
+│  │  │  │  │  Port: 8069  │  │  Port: 8080  │  │  (when CPU >70%) │   │   │   │   │
+│  │  │  │  └──────┬───────┘  └──────┬───────┘  └──────────────────┘   │   │   │   │
+│  │  │  │         │                  │                                │   │   │   │
+│  │  │  │  ┌──────┴──────────────────┴──────────────────────────────┐ │   │   │   │
+│  │  │  │  │  MariaDB Pod (Moodle DB) ── backed up daily to GCS     │ │   │   │   │
+│  │  │  │  └────────────────────────────────────────────────────────┘ │   │   │   │
+│  │  │  │                                                             │   │   │   │
+│  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │   │   │   │
+│  │  │  │  │  ArgoCD      │  │  Prometheus  │  │  Grafana         │   │   │   │   │
+│  │  │  │  │  (GitOps)    │  │  (Metrics)   │  │  (Dashboards)    │   │   │   │   │
+│  │  │  │  └──────────────┘  └──────────────┘  └──────────────────┘   │   │   │   │
+│  │  │  └─────────────────────────────────────────────────────────────┘   │   │   │
+│  │  │                                                                    │   │   │
+│  │  │  ┌─── GKE Node 2 (autoscaled when needed) ─────────────────────┐   │   │   │
+│  │  │  │  (Provisioned by Cluster Autoscaler when pods can't fit     │   │   │   │
+│  │  │  │   on Node 1. Removed when no longer needed.)                │   │   │   │
+│  │  │  └─────────────────────────────────────────────────────────────┘   │   │   │
+│  │  └────────────────────────────────────────────────────────────────────┘   │   │
+│  │         │                                                                 │   │
+│  │         │ Private Service Access (VPC Peering)                            │   │
+│  │         ▼                                                                 │   │
+│  │  ┌─── db-subnet (10.0.2.0/24) ── PRIVATE ─────────────────────────────┐   │   │
+│  │  │                                                                    │   │   │
+│  │  │  ┌──────────────────────────────────────────────────────────┐      │   │   │
+│  │  │  │  Cloud SQL (PostgreSQL 15)                               │      │   │   │
+│  │  │  │  Instance: esmos-healthcare-postgres                     │      │   │   │
+│  │  │  │  Tier: db-f1-micro  │  Private IP only  │  Backups: On   │      │   │   │
+│  │  │  │  Database: odoo     │  User: odooadmin                   │      │   │   │
+│  │  │  └──────────────────────────────────────────────────────────┘      │   │   │
+│  │  └────────────────────────────────────────────────────────────────────┘   │   │
+│  │                                                                           │   │
+│  │  ┌─── Firewall Rules ────────────────────────────────────────────────┐    │   │
+│  │  │  DENY   all inbound from 0.0.0.0/0 to tag:gke-node (pri 1000)     │    │   │
+│  │  │  ALLOW  all internal traffic from 10.0.0.0/8          (pri 900)   │    │   │
+│  │  └───────────────────────────────────────────────────────────────────┘    │   │
+│  └───────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                  │
+└──────────────────────────────────────────────────────────────────────────────────┘
+
+┌─── External Services (outside GCP) ───────────────────────────────────────────────┐
+│                                                                                   │
+│  GitHub Repository                     GitHub Actions                             │
+│  ├── /terraform/*                      ├── PR → terraform plan (RFC)              │
+│  ├── /kubernetes/*                     ├── Merge → terraform apply (Deploy)       │
+│  └── ArgoCD syncs from here            └── Manual → terraform destroy (Teardown)  │
+│                                                                                   │
+│  Workload Identity Federation (OIDC)                                              │
+│  └── GitHub Actions authenticates to GCP without stored credentials               │
+│                                                                                   │
+└───────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Scaling Behavior (HPA + Cluster Autoscaler)
+
+```
+                    Normal                          Training Day (50 users)
+                    ──────                          ───────────────────────
+
+Node 1              Node 1                          Node 1              Node 2
+┌────────────┐      ┌────────────┐                  ┌────────────┐      ┌────────────┐
+│ Odoo    x1 │      │ Odoo    x1 │     HPA          │ Odoo    x1 │      │ Moodle  x1 │
+│ Moodle  x1 │  ──→ │ Moodle  x1 │  ──scales──→     │ Moodle  x1 │      │ Moodle  x1 │
+│ ArgoCD     │      │ ArgoCD     │   to 3 pods      │ ArgoCD     │      │            │
+│ Monitoring │      │ Monitoring │                  │ Monitoring │      │            │
+└────────────┘      └────────────┘                  └────────────┘      └────────────┘
+  CPU: 30%            CPU: 70%+                        CPU: 50%            CPU: 40%
+
+                    HPA triggers at 70% CPU.
+                    Cluster Autoscaler adds Node 2 when pods can't fit.
+                    After load drops, scales back to 1 pod + 1 node.
 ```
 
 ## Project Structure
