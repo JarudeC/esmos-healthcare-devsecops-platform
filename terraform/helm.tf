@@ -18,8 +18,8 @@ resource "helm_release" "argocd" {
   version          = "5.55.0"
   namespace        = "argocd"
   create_namespace = true
-  wait             = true
-  timeout          = 600
+  wait             = false
+  timeout          = 900
 
   # Budget-friendly: disable HA components
   set {
@@ -89,8 +89,8 @@ resource "helm_release" "prometheus_stack" {
   version          = "55.5.0"
   namespace        = "monitoring"
   create_namespace = true
-  wait             = true
-  timeout          = 600
+  wait             = false
+  timeout          = 900
 
   # Budget-friendly: reduce resource usage
   set {

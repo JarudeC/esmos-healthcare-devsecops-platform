@@ -14,7 +14,7 @@ GitHub Actions (CI/CD)
                           │
                           ├── GKE Cluster (1-2 nodes, e2-medium, private)
                           ├── Cloud SQL PostgreSQL (private IP, daily backups)
-                          ├── VPC (3 subnets: gke, db, ingress)
+                          ├── VPC (subnets: gke, db + private service access)
                           ├── ArgoCD (GitOps controller)
                           │     ├── Syncs → Odoo + Helpdesk (Bitnami Helm)
                           │     └── Syncs → Moodle (Bitnami Helm, IP-whitelisted)
@@ -24,84 +24,85 @@ GitHub Actions (CI/CD)
 ### Infrastructure Diagram
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│  GCP Project: esmos-healthcare             Region: asia-southeast1 (Singapore)   │
-│                                                                                  │
-│  ┌─── GCS Bucket ────────────────────────────────────────────────────────────┐   │
-│  │  gs://esmos-healthcare-tfstate                                            │   │
-│  │  ├── terraform/state/    (Terraform state)                                │   │
-│  │  └── moodle-backups/     (Daily MariaDB dumps, 7-day retention)           │   │
-│  └───────────────────────────────────────────────────────────────────────────┘   │
-│                                                                                  │
-│  ┌─── VPC: esmos-healthcare-vpc (10.0.0.0/16) ───────────────────────────────┐   │
-│  │                                                                           │   │
-│  │  ┌─── ingress-subnet (10.0.3.0/24) ── PUBLIC-FACING ──────────────────┐   │   │
-│  │  │                                                                    │   │   │
-│  │  │  NGINX Ingress Controller                                          │   │   │
-│  │  │  ├── odoo.esmos-healthcare.local    → routes to Odoo pods          │   │   │
-│  │  │  └── moodle.esmos-healthcare.local  → routes to Moodle pods        │   │   │
-│  │  │      (IP whitelist: 116.87.48.126/32)       (internal access only)       │   │   │
-│  │  └────────────────────────────────────────────────────────────────────┘   │   │
-│  │         │                                                                 │   │
-│  │         ▼                                                                 │   │
-│  │  ┌─── gke-subnet (10.0.1.0/24) ── PRIVATE ────────────────────────────┐   │   │
-│  │  │  Pods: 10.10.0.0/16    Services: 10.20.0.0/16                      │   │   │
-│  │  │                                                                    │   │   │
-│  │  │  ┌─── GKE Node 1 (e2-medium: 2 vCPU, 4GB) ── No Public IP ─────┐   │   │   │
-│  │  │  │                                                             │   │   │   │
-│  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │   │   │   │
-│  │  │  │  │  Odoo Pod    │  │  Moodle Pod  │  │  Moodle Pod #2   │   │   │   │   │
-│  │  │  │  │  (1 replica) │  │  (1 replica) │  │  (HPA scaled)    │   │   │   │   │
-│  │  │  │  │  Port: 8069  │  │  Port: 8080  │  │  (when CPU >70%) │   │   │   │   │
-│  │  │  │  └──────┬───────┘  └──────┬───────┘  └──────────────────┘   │   │   │   │
-│  │  │  │         │                 │                                 │   │   │   │
-│  │  │  │  ┌──────┴─────────────────┴───────────────────────────────┐ │   │   │   │
-│  │  │  │  │  MariaDB Pod (Moodle DB) ── backed up daily to GCS     │ │   │   │   │
-│  │  │  │  └────────────────────────────────────────────────────────┘ │   │   │   │
-│  │  │  │                                                             │   │   │   │
-│  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │   │   │   │
-│  │  │  │  │  ArgoCD      │  │  Prometheus  │  │  Grafana         │   │   │   │   │
-│  │  │  │  │  (GitOps)    │  │  (Metrics)   │  │  (Dashboards)    │   │   │   │   │
-│  │  │  │  └──────────────┘  └──────────────┘  └──────────────────┘   │   │   │   │
-│  │  │  └─────────────────────────────────────────────────────────────┘   │   │   │
-│  │  │                                                                    │   │   │
-│  │  │  ┌─── GKE Node 2 (autoscaled when needed) ─────────────────────┐   │   │   │
-│  │  │  │  (Provisioned by Cluster Autoscaler when pods can't fit     │   │   │   │
-│  │  │  │   on Node 1. Removed when no longer needed.)                │   │   │   │
-│  │  │  └─────────────────────────────────────────────────────────────┘   │   │   │
-│  │  └────────────────────────────────────────────────────────────────────┘   │   │
-│  │         │                                                                 │   │
-│  │         │ Private Service Access (VPC Peering)                            │   │
-│  │         ▼                                                                 │   │
-│  │  ┌─── db-subnet (10.0.2.0/24) ── PRIVATE ─────────────────────────────┐   │   │
-│  │  │                                                                    │   │   │
-│  │  │  ┌──────────────────────────────────────────────────────────┐      │   │   │
-│  │  │  │  Cloud SQL (PostgreSQL 15)                               │      │   │   │
-│  │  │  │  Instance: esmos-healthcare-postgres                     │      │   │   │
-│  │  │  │  Tier: db-f1-micro  │  Private IP only  │  Backups: On   │      │   │   │
-│  │  │  │  Database: odoo     │  User: odooadmin                   │      │   │   │
-│  │  │  └──────────────────────────────────────────────────────────┘      │   │   │
-│  │  └────────────────────────────────────────────────────────────────────┘   │   │
-│  │                                                                           │   │
-│  │  ┌─── Firewall Rules ────────────────────────────────────────────────┐    │   │
-│  │  │  DENY   all inbound from 0.0.0.0/0 to tag:gke-node (pri 1000)     │    │   │
-│  │  │  ALLOW  all internal traffic from 10.0.0.0/8          (pri 900)   │    │   │
-│  │  └───────────────────────────────────────────────────────────────────┘    │   │
-│  └───────────────────────────────────────────────────────────────────────────┘   │
-│                                                                                  │
-└──────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  GCP Project: esmos-healthcare        Region: asia-southeast1 (Singapore)    │
+│                                                                              │
+│  ┌─── GCS Bucket (outside VPC) ──────────────────────────────────────────┐   │
+│  │  gs://esmos-healthcare-tfstate                                        │   │
+│  │  ├── terraform/state/    (Terraform state)                            │   │
+│  │  └── moodle-backups/     (Daily MariaDB dumps, 7-day retention)       │   │
+│  └───────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  ┌─── VPC: esmos-healthcare-vpc (10.0.0.0/16) ──────────────────────────┐    │
+│  │                                                                      │    │
+│  │  ┌─── gke-subnet (10.0.1.0/24) ── PRIVATE ────────────────────────┐  │    │
+│  │  │  Pods: 10.10.0.0/16    Services: 10.20.0.0/16                  │  │    │
+│  │  │                                                                │  │    │
+│  │  │  ┌─── GKE Node 1 (e2-medium: 2 vCPU, 4GB) ── No Public IP ──┐  │  │    │
+│  │  │  │                                                          │  │  │    │
+│  │  │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐   │  │  │    │
+│  │  │  │  │ Odoo Pod    │  │ Moodle Pod  │  │ Moodle Pod #2   │   │  │  │    │
+│  │  │  │  │ (1 replica) │  │ (1 replica) │  │ (HPA scaled)    │   │  │  │    │
+│  │  │  │  │ Port: 8069  │  │ Port: 8080  │  │ (when CPU >70%) │   │  │  │    │
+│  │  │  │  └──────┬──────┘  └──────┬──────┘  └─────────────────┘   │  │  │    │
+│  │  │  │         │                │                               │  │  │    │
+│  │  │  │         │         ┌──────┴──────────────────────────┐    │  │  │    │
+│  │  │  │         │         │ MariaDB Pod (Moodle DB only)    │    │  │  │    │
+│  │  │  │         │         │ backed up daily to GCS bucket   │    │  │  │    │
+│  │  │  │         │         └─────────────────────────────────┘    │  │  │    │
+│  │  │  │         │                                                │  │  │    │
+│  │  │  │         └──→ connects to Cloud SQL (db-subnet below)     │  │  │    │
+│  │  │  │                                                          │  │  │    │
+│  │  │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐   │  │  │    │
+│  │  │  │  │ ArgoCD      │  │ Prometheus  │  │ Grafana         │   │  │  │    │
+│  │  │  │  │ (GitOps)    │  │ (Metrics)   │  │ (Dashboards)    │   │  │  │    │
+│  │  │  │  └─────────────┘  └─────────────┘  └─────────────────┘   │  │  │    │
+│  │  │  └──────────────────────────────────────────────────────────┘  │  │    │
+│  │  │                                                                │  │    │
+│  │  │  ┌─── GKE Node 2 (autoscaled when needed) ─────────────────┐   │  │    │
+│  │  │  │  Provisioned by Cluster Autoscaler when pods can't fit  │   │  │    │
+│  │  │  │  on Node 1. Removed when no longer needed.              │   │  │    │
+│  │  │  └─────────────────────────────────────────────────────────┘   │  │    │
+│  │  └────────────────────────────────────────────────────────────────┘  │    │
+│  │         │                                                            │    │
+│  │         │ Private Service Access (VPC Peering)                       │    │
+│  │         ▼                                                            │    │
+│  │  ┌─── db-subnet (10.0.2.0/24) ── PRIVATE ────────────────────────┐   │    │
+│  │  │                                                               │   │    │
+│  │  │  ┌───────────────────────────────────────────────────────┐    │   │    │
+│  │  │  │ Cloud SQL (PostgreSQL 15)                             │    │   │    │
+│  │  │  │ Instance: esmos-healthcare-postgres                   │    │   │    │
+│  │  │  │ Tier: db-f1-micro  │  Private IP only  │  Backups: On │    │   │    │
+│  │  │  │ Database: odoo     │  User: odooadmin                 │    │   │    │
+│  │  │  └───────────────────────────────────────────────────────┘    │   │    │
+│  │  └───────────────────────────────────────────────────────────────┘   │    │
+│  │                                                                      │    │
+│  │  ┌─── Firewall Rules ────────────────────────────────────────────┐   │    │
+│  │  │  DENY   all inbound from 0.0.0.0/0 to tag:gke-node (pri 1000) │   │    │
+│  │  │  ALLOW  all internal traffic from 10.0.0.0/8         (pri 900)│   │    │
+│  │  └───────────────────────────────────────────────────────────────┘   │    │
+│  │                                                                      │    │
+│  │  ┌─── Ingress (defined in Helm values, no Ingress Controller) ────┐  │    │
+│  │  │  Odoo:   odoo.esmos-healthcare.local   (ClusterIP + ingress)   │  │    │
+│  │  │  Moodle: moodle.esmos-healthcare.local (ClusterIP + ingress)   │  │    │
+│  │  │  Moodle IP whitelist: 116.87.48.126/32                         │  │    │
+│  │  │  Access method: kubectl port-forward (no public endpoint)      │  │    │
+│  │  └────────────────────────────────────────────────────────────────┘  │    │
+│  └──────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
 
-┌─── External Services (outside GCP) ───────────────────────────────────────────────┐
-│                                                                                   │
-│  GitHub Repository                     GitHub Actions                             │
-│  ├── /terraform/*                      ├── PR → terraform plan (RFC)              │
-│  ├── /kubernetes/*                     ├── Merge → terraform apply (Deploy)       │
-│  └── ArgoCD syncs from here            └── Manual → terraform destroy (Teardown)  │
-│                                                                                   │
-│  Workload Identity Federation (OIDC)                                              │
-│  └── GitHub Actions authenticates to GCP without stored credentials               │
-│                                                                                   │
-└───────────────────────────────────────────────────────────────────────────────────┘
+┌─── External Services (outside GCP) ───────────────────────────────────────────┐
+│                                                                               │
+│  GitHub Repository                  GitHub Actions                            │
+│  ├── /terraform/*                   ├── PR → terraform plan (RFC)             │
+│  ├── /kubernetes/*                  ├── Merge → terraform apply (Deploy)      │
+│  └── ArgoCD syncs from here         └── Manual → terraform destroy (Teardown) │
+│                                                                               │
+│  Workload Identity Federation (OIDC)                                          │
+│  └── GitHub Actions authenticates to GCP without stored credentials           │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Scaling Behavior (HPA + Cluster Autoscaler)
@@ -266,9 +267,9 @@ kubectl get pods -A
 ### Step 6: Access services
 
 ```bash
-# ArgoCD dashboard
-kubectl port-forward svc/argocd-server -n argocd 8080:443
-# → https://localhost:8080
+# ArgoCD dashboard (each command needs its own terminal)
+kubectl port-forward svc/argocd-server -n argocd 8443:443
+# → https://localhost:8443
 
 # Grafana monitoring dashboard
 kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
@@ -283,10 +284,13 @@ kubectl port-forward svc/moodle -n moodle 8080:8080
 # → http://localhost:8080
 ```
 
-### Step 7: Enable Odoo Helpdesk
+### Step 7: Set up Odoo Helpdesk
+
+> Note: Bitnami's community Odoo does not include the Helpdesk module (Enterprise only).
+> Use the built-in **Helpdesk** alternative or install a free helpdesk app from the Odoo App Store.
 
 1. Login to Odoo → **Apps** menu
-2. Search **"Helpdesk"** → click **Install**
+2. Search for a helpdesk/ticketing app → click **Install**
 3. Configure helpdesk teams and SLA policies
 
 ## Backups and Recovery
@@ -339,7 +343,7 @@ You can also teardown from GitHub without the CLI:
 2. Select **apply** from the dropdown → click **Run workflow**
 
 **Option B — Via Git push:**
-1. Make any change to a file in `terraform/` (even a comment)
+1. Make any change to a file in `terraform/` (even a comment) — the pipeline only triggers on `terraform/**` changes
 2. Push to main or open a PR and merge
 
 > Note: If you used `scripts/teardown.sh` (which also deletes the state bucket and Service Account), you need to run `bash scripts/bootstrap.sh` again first and re-add the GitHub secrets.
