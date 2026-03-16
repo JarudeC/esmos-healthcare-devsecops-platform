@@ -140,6 +140,8 @@ spec:
                   --adminemail=admin@esmos.local \
                   --non-interactive \
                   --agree-license
+                echo "\$CFG->sslproxy = false;" >> /var/www/html/config.php
+                sed -i "s|'wwwroot'.*|'wwwroot'   => 'http://localhost:8080',|" /var/www/html/config.php
               fi
               chown -R www-data:www-data /var/www/html /var/www/moodledata
               apache2ctl -D FOREGROUND
