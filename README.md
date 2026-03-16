@@ -253,59 +253,61 @@ To follow the RFC workflow:
 2. Open a Pull Request — GitHub Actions runs `terraform plan` (RFC review)
 3. Review the plan, then merge — GitHub Actions runs `terraform apply`
 
-### Step 5: Verify and configure
+### Step 5: Wait for pipeline and get cluster access
 
-After the pipeline completes:
+The first `terraform apply` may take 10-15 minutes. It may also need 2-3 re-runs (Actions → Re-run all jobs) as Cloud SQL and Helm charts can timeout on first creation. This is normal.
+
+Once the pipeline succeeds:
 
 ```bash
+# Install GKE auth plugin (one-time)
+gcloud components install gke-gcloud-auth-plugin
+
 # Get cluster credentials
 gcloud container clusters get-credentials esmos-healthcare-gke --zone asia-southeast1-a
 
-# Check all pods and ArgoCD apps
+# Verify everything is running
 kubectl get pods -A
 kubectl get applications -n argocd
+```
 
-# Get Cloud SQL private IP and update Odoo config
+### Step 6: Configure Odoo database connection
+
+```bash
+# Get Cloud SQL private IP
 gcloud sql instances describe esmos-healthcare-postgres --format="value(ipAddresses[0].ipAddress)"
-# Copy the IP, then update kubernetes/odoo/deployment.yaml → HOST env var with this IP
-# Push the change — ArgoCD will auto-sync Odoo with the correct DB connection
+
+# Set the password on Cloud SQL and create K8s secret (use any password)
+gcloud sql users set-password odooadmin --instance=esmos-healthcare-postgres --password=YOUR_PASSWORD
+kubectl create secret generic odoo-db-secret -n odoo --from-literal=password=YOUR_PASSWORD
 ```
 
-### Step 6: Access services
+Update `kubernetes/odoo/deployment.yaml` → set `HOST` env var to the Cloud SQL private IP. Push the change — ArgoCD will auto-sync.
+
+### Step 7: Access services
+
+Each command needs its own terminal:
 
 ```bash
-# ArgoCD dashboard (each command needs its own terminal)
-kubectl port-forward svc/argocd-server -n argocd 8443:443
-# → https://localhost:8443
-
-# Grafana monitoring dashboard
-kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
-# → http://localhost:3000 (admin / esmos-admin)
-
-# Odoo
+# Odoo → http://localhost:8069
 kubectl port-forward svc/odoo -n odoo 8069:8069
-# → http://localhost:8069
 
-# Moodle
+# Moodle → http://localhost:8080 (admin / esmos-admin)
 kubectl port-forward svc/moodle -n moodle 8080:8080
-# → http://localhost:8080
+
+# Grafana → http://localhost:3000 (admin / esmos-admin)
+kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
+
+# ArgoCD → https://localhost:8443
+kubectl port-forward svc/argocd-server -n argocd 8443:443
 ```
 
-### Step 7: Enable Moodle backup CronJob
+> Note: Moodle takes 5-10 minutes on first boot (clones source code, runs installer). Check progress with `kubectl logs -n moodle -l app=moodle -f`.
 
-```bash
-kubectl apply -f kubernetes/moodle/backup-cronjob.yaml
-```
+### Step 8: Set up Odoo
 
-This creates a daily backup job that dumps MariaDB to the GCS bucket at 2am SGT.
-
-### Step 8: Set up Odoo Helpdesk
-
-> Note: Odoo Community Edition does not include the Enterprise Helpdesk module.
-> Use the built-in **Helpdesk** alternative or install a free helpdesk/ticketing app from the Odoo App Store.
-
-1. Login to Odoo → **Apps** menu
-2. Search for a helpdesk/ticketing app → click **Install**
+1. On first access, Odoo shows a database creation page — fill in the form and click **Create Database**
+2. Go to **Apps** menu → search for a helpdesk/ticketing app → click **Install**
 3. Configure helpdesk teams and SLA policies
 
 ## Backups and Recovery
