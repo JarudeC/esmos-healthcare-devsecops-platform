@@ -141,6 +141,7 @@ spec:
                   --non-interactive \
                   --agree-license
               fi
+              chown -R www-data:www-data /var/www/html /var/www/moodledata
               apache2ctl -D FOREGROUND
           resources:
             requests:
