@@ -131,7 +131,7 @@ spec:
               memory: 1Gi
           volumeMounts:
             - name: moodle-data
-              mountPath: /bitnami/moodle
+              mountPath: /bitnami/moodledata
           startupProbe:
             tcpSocket:
               port: 8080
