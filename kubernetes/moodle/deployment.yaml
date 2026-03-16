@@ -132,17 +132,18 @@ spec:
           volumeMounts:
             - name: moodle-data
               mountPath: /bitnami/moodle
-          livenessProbe:
-            httpGet:
-              path: /login/index.php
+          startupProbe:
+            tcpSocket:
               port: 8080
-            initialDelaySeconds: 300
+            failureThreshold: 30
+            periodSeconds: 30
+          livenessProbe:
+            tcpSocket:
+              port: 8080
             periodSeconds: 30
           readinessProbe:
-            httpGet:
-              path: /login/index.php
+            tcpSocket:
               port: 8080
-            initialDelaySeconds: 60
             periodSeconds: 10
       volumes:
         - name: moodle-data
