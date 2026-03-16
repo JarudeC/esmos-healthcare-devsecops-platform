@@ -2,6 +2,37 @@
 
 A Service Management platform for Healthcare, deploying **Odoo** (ERP/Operations), **Moodle** (LMS/Training), and a **compliant Helpdesk** on **Google Kubernetes Engine** using an ITIL 4.0 DevSecOps approach.
 
+## Quick Start (For Team Members)
+
+The platform is already deployed. To access the services:
+
+1. **Install tools** (one-time):
+   - [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`winget install Google.CloudSDK` on Windows)
+   - After install, run: `gcloud components install gke-gcloud-auth-plugin`
+
+2. **Login and connect to cluster:**
+   ```bash
+   gcloud auth login
+   gcloud container clusters get-credentials esmos-healthcare-gke --zone asia-southeast1-a --project esmos-healthcare
+   ```
+
+3. **Access services** (each command in its own terminal):
+   ```bash
+   # Odoo → http://localhost:8069
+   kubectl port-forward svc/odoo -n odoo 8069:8069
+
+   # Moodle → http://localhost:8080 (admin / esmos-admin)
+   kubectl port-forward svc/moodle -n moodle 8080:8080
+
+   # Grafana → http://localhost:3000 (admin / esmos-admin)
+   kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
+
+   # ArgoCD → https://localhost:8443
+   kubectl port-forward svc/argocd-server -n argocd 8443:443
+   ```
+
+> All services share the same backend — any changes you make are visible to everyone.
+
 ## Architecture
 
 ### CI/CD Flow
@@ -14,7 +45,7 @@ GitHub Actions (CI/CD)
                           │
                           ├── GKE Cluster (1-3 nodes, e2-medium, private)
                           ├── Cloud SQL PostgreSQL (private IP, daily backups)
-                          ├── VPC (subnets: gke, db, ingress + private service access)
+                          ├── VPC (subnets: gke, db + private service access, Cloud NAT)
                           ├── ArgoCD (GitOps controller)
                           │     ├── Syncs → Odoo (official image, from Git)
                           │     └── Syncs → Moodle (official image, from Git)
@@ -85,7 +116,7 @@ GitHub Actions (CI/CD)
 │  │  ┌─── Access (No public endpoint) ────────────────────────────────┐  │    │
 │  │  │  All services use ClusterIP (internal only)                    │  │    │
 │  │  │  Access method: kubectl port-forward from authorized machine   │  │    │
-│  │  │  Moodle IP whitelist: 116.87.48.126/32 (ingress annotation)    │  │    │
+│  │  │  Cloud NAT: outbound internet for private nodes (image pulls)  │  │    │
 │  │  └────────────────────────────────────────────────────────────────┘  │    │
 │  └──────────────────────────────────────────────────────────────────────┘    │
 │                                                                              │
@@ -156,7 +187,7 @@ Node 1              Node 1                          Node 1              Node 2  
 |--------|---------|-------|--------|
 | **Odoo** | Meal plan inventory & operations | Operations staff (post-training) | Internal, authenticated |
 | **Helpdesk** (Odoo app or alternative) | Centralized support across Odoo & Moodle | Support managers, all staff | Internal, role-based |
-| **Moodle** | Mandatory compliance training (500+ staff) | All healthcare staff | Internal only, IP-whitelisted |
+| **Moodle** | Mandatory compliance training (500+ staff) | All healthcare staff | Internal only, port-forward access |
 | **Grafana** | Live monitoring dashboard | SRE / operations team | Internal, port-forwarded |
 
 ### Service Integration Workflow
@@ -372,8 +403,8 @@ You can also teardown from GitHub without the CLI:
 | **Data residency** | All resources in `asia-southeast1` (Singapore) |
 | **Network isolation** | GKE private nodes, firewall deny-all internet inbound |
 | **Database security** | Cloud SQL private IP only, no public access |
-| **Access control** | No public endpoints; access via `kubectl port-forward`. Moodle IP-whitelisted (116.87.48.126/32). Odoo access requires training completion |
-| **Least privilege** | All containers run as non-root (UID 1001), pod security contexts enforced |
+| **Access control** | No public endpoints; access via `kubectl port-forward` from authorized machines only. Odoo access requires training completion |
+| **Least privilege** | Pod security contexts enforced, minimal resource requests |
 | **CI/CD auth** | Workload Identity Federation — no stored credentials, OIDC-based |
 | **Backups** | Cloud SQL daily (Odoo), CronJob daily to GCS (Moodle), 7-day retention |
 | **Monitoring** | Prometheus metrics + Grafana dashboards for uptime and resource usage |
