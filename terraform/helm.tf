@@ -48,10 +48,13 @@ resource "helm_release" "argocd" {
   }
 
   # Enable OCI Helm repo support (required for Bitnami charts)
-  set {
-    name  = "configs.cm.helm\\.valuesFileSchemes"
-    value = "secrets+gpg-import,secrets+gpg-import-kubernetes,secrets+age-import,secrets+age-import-kubernetes,secrets,secrets+literal,https,http,oci"
-  }
+  values = [<<-EOT
+    configs:
+      cm:
+        helm.valuesFileSchemes: >-
+          secrets+gpg-import,secrets+gpg-import-kubernetes,secrets+age-import,secrets+age-import-kubernetes,secrets,secrets+literal,https,http,oci
+  EOT
+  ]
 
   # Resource limits for e2-medium nodes
   set {
