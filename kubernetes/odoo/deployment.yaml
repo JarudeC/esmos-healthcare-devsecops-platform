@@ -72,14 +72,12 @@ spec:
             - name: odoo-addons
               mountPath: /mnt/extra-addons
           livenessProbe:
-            httpGet:
-              path: /web/login
+            tcpSocket:
               port: 8069
             initialDelaySeconds: 120
             periodSeconds: 30
           readinessProbe:
-            httpGet:
-              path: /web/login
+            tcpSocket:
               port: 8069
             initialDelaySeconds: 30
             periodSeconds: 10
