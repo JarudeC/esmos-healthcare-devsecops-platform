@@ -10,7 +10,7 @@ spec:
 
   sources:
     - chart: moodle
-      repoURL: https://charts.bitnami.com/bitnami
+      repoURL: registry-1.docker.io/bitnamicharts
       targetRevision: "*"
       helm:
         valueFiles:
