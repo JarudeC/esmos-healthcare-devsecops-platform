@@ -100,20 +100,28 @@ spec:
     spec:
       containers:
         - name: moodle
-          image: moodlehq/moodle-php-apache:8.3
+          image: docker.io/bitnamilegacy/moodle:4.5.4-debian-12-r0
           ports:
-            - containerPort: 80
+            - containerPort: 8080
           env:
-            - name: MOODLE_DOCKER_DBTYPE
+            - name: MOODLE_DATABASE_TYPE
               value: "mariadb"
-            - name: MOODLE_DOCKER_DBHOST
+            - name: MOODLE_DATABASE_HOST
               value: "mariadb"
-            - name: MOODLE_DOCKER_DBNAME
+            - name: MOODLE_DATABASE_PORT_NUMBER
+              value: "3306"
+            - name: MOODLE_DATABASE_NAME
               value: "moodle"
-            - name: MOODLE_DOCKER_DBUSER
+            - name: MOODLE_DATABASE_USER
               value: "moodle"
-            - name: MOODLE_DOCKER_DBPASS
+            - name: MOODLE_DATABASE_PASSWORD
               value: "esmos-moodle-db"
+            - name: MOODLE_USERNAME
+              value: "admin"
+            - name: MOODLE_PASSWORD
+              value: "esmos-admin"
+            - name: MOODLE_SITE_NAME
+              value: "ESMOS Healthcare Training"
           resources:
             requests:
               cpu: 100m
@@ -123,18 +131,18 @@ spec:
               memory: 1Gi
           volumeMounts:
             - name: moodle-data
-              mountPath: /var/www/moodledata
+              mountPath: /bitnami/moodle
           livenessProbe:
             httpGet:
-              path: /
-              port: 80
-            initialDelaySeconds: 120
+              path: /login/index.php
+              port: 8080
+            initialDelaySeconds: 300
             periodSeconds: 30
           readinessProbe:
             httpGet:
-              path: /
-              port: 80
-            initialDelaySeconds: 30
+              path: /login/index.php
+              port: 8080
+            initialDelaySeconds: 60
             periodSeconds: 10
       volumes:
         - name: moodle-data
@@ -152,7 +160,7 @@ spec:
     app: moodle
   ports:
     - port: 8080
-      targetPort: 80
+      targetPort: 8080
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
