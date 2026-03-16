@@ -48,7 +48,7 @@ spec:
             - containerPort: 8069
           env:
             - name: HOST
-              value: ""  # Cloud SQL private IP — update after deployment
+              value: "172.22.0.5"  # Cloud SQL private IP
             - name: PORT
               value: "5432"
             - name: USER
