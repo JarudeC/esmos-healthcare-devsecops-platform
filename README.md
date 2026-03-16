@@ -12,12 +12,12 @@ GitHub Actions (CI/CD)
     ├── PR opened ──→ terraform plan (RFC review)
     └── PR merged ──→ terraform apply
                           │
-                          ├── GKE Cluster (1-2 nodes, e2-medium, private)
+                          ├── GKE Cluster (1-3 nodes, e2-medium, private)
                           ├── Cloud SQL PostgreSQL (private IP, daily backups)
                           ├── VPC (subnets: gke, db, ingress + private service access)
                           ├── ArgoCD (GitOps controller)
-                          │     ├── Syncs → Odoo (Bitnami Helm)
-                          │     └── Syncs → Moodle (Bitnami Helm)
+                          │     ├── Syncs → Odoo (official image, from Git)
+                          │     └── Syncs → Moodle (official image, from Git)
                           └── Prometheus + Grafana (live monitoring)
 ```
 
@@ -59,9 +59,9 @@ GitHub Actions (CI/CD)
 │  │  │  │  └─────────────┘  └─────────────┘  └─────────────────┘   │  │  │    │
 │  │  │  └──────────────────────────────────────────────────────────┘  │  │    │
 │  │  │                                                                │  │    │
-│  │  │  ┌─── GKE Node 2 (autoscaled when needed) ─────────────────┐   │  │    │
+│  │  │  ┌─── GKE Node 2-3 (autoscaled when needed) ───────────────┐   │  │    │
 │  │  │  │  Provisioned by Cluster Autoscaler when pods can't fit  │   │  │    │
-│  │  │  │  on Node 1. Removed when no longer needed.              │   │  │    │
+│  │  │  │  on Node 1. Max 3 nodes. Removed when no longer needed. │   │  │    │
 │  │  │  └─────────────────────────────────────────────────────────┘   │  │    │
 │  │  └────────────────────────────────────────────────────────────────┘  │    │
 │  │         │                                                            │    │
@@ -110,18 +110,18 @@ GitHub Actions (CI/CD)
                     Normal                          Training Day (50 users)
                     ──────                          ───────────────────────
 
-Node 1              Node 1                          Node 1              Node 2
-┌────────────┐      ┌────────────┐                  ┌────────────┐      ┌────────────┐
-│ Odoo    x1 │      │ Odoo    x1 │     HPA          │ Odoo    x1 │      │ Moodle  x1 │
-│ Moodle  x1 │  ──→ │ Moodle  x1 │  ──scales──→     │ Moodle  x1 │      │ Moodle  x1 │
-│ ArgoCD     │      │ ArgoCD     │   to 3 pods      │ ArgoCD     │      │            │
-│ Monitoring │      │ Monitoring │                  │ Monitoring │      │            │
-└────────────┘      └────────────┘                  └────────────┘      └────────────┘
-  CPU: 30%            CPU: 70%+                        CPU: 50%            CPU: 40%
+Node 1              Node 1                          Node 1              Node 2          Node 3
+┌────────────┐      ┌────────────┐                  ┌────────────┐      ┌────────────┐  ┌────────────┐
+│ Odoo    x1 │      │ Odoo    x1 │     HPA          │ Odoo    x1 │      │ Moodle  x1 │  │ Moodle  x1 │
+│ Moodle  x1 │  ──→ │ Moodle  x1 │  ──scales──→     │ Moodle  x1 │      │ MariaDB    │  │            │
+│ ArgoCD     │      │ ArgoCD     │   to 3 pods      │ ArgoCD     │      │            │  │            │
+│ Monitoring │      │ Monitoring │                  │ Monitoring │      │            │  │            │
+└────────────┘      └────────────┘                  └────────────┘      └────────────┘  └────────────┘
+  CPU: 30%            CPU: 70%+                        CPU: 50%            CPU: 40%       CPU: 30%
 
                     HPA triggers at 70% CPU.
-                    Cluster Autoscaler adds Node 2 when pods can't fit.
-                    After load drops, scales back to 1 pod + 1 node.
+                    Cluster Autoscaler adds Node 2-3 when pods can't fit.
+                    After load drops, scales back to 1 pod + 1 node (max 3 nodes).
 ```
 
 ## Project Structure
@@ -139,13 +139,13 @@ Node 1              Node 1                          Node 1              Node 2
 │   └── helm.tf                           # ArgoCD, Prometheus/Grafana, App CRDs
 └── kubernetes/
     ├── odoo/
-    │   ├── values.yaml                   # Odoo configuration
-    │   └── argocd-odoo-app.yaml          # ArgoCD Application CRD for Odoo
+    │   ├── deployment.yaml              # Odoo Deployment, Service, PVCs (official image)
+    │   └── argocd-odoo-app.yaml         # ArgoCD Application CRD for Odoo
     └── moodle/
-        ├── values.yaml                   # Moodle configuration (IP-whitelisted)
-        ├── argocd-moodle-app.yaml        # ArgoCD Application CRD for Moodle
-        ├── backup-cronjob.yaml           # Daily MariaDB backup to GCS
-        └── restore.sh                    # Restore from backup
+        ├── deployment.yaml              # Moodle + MariaDB Deployments, Services, HPA, PVCs
+        ├── argocd-moodle-app.yaml       # ArgoCD Application CRD for Moodle
+        ├── backup-cronjob.yaml          # Daily MariaDB backup to GCS
+        └── restore.sh                   # Restore from backup
 ```
 
 ## Service Design
@@ -175,7 +175,7 @@ Node 1              Node 1                          Node 1              Node 2
 |----------|--------|---------------|
 | **Cloud provider** | GCP | Full Owner permissions, Workload Identity Federation for CI/CD, free tier GKE zonal cluster |
 | **Region** | `asia-southeast1` (Singapore) | Data residency compliance for healthcare client |
-| **Cluster** | GKE, 1-2 nodes, e2-medium | Cost-effective (free zonal cluster management), autoscales only when load demands it |
+| **Cluster** | GKE, 1-3 nodes, e2-medium | Cost-effective (free zonal cluster management), autoscales only when load demands it |
 | **Database** | Cloud SQL db-f1-micro | Cheapest tier with automated daily backups and private networking |
 | **Moodle DB** | Bundled MariaDB + daily CronJob backup to GCS | Avoids cost of a second Cloud SQL instance; RPO ~24h |
 | **Replicas** | 1 per service, HPA scales Moodle to 3 under load | Balances cost and availability — idle replicas waste credits |
@@ -190,7 +190,7 @@ Node 1              Node 1                          Node 1              Node 2
 | **Uptime SLA** | 99.5% | Kubernetes self-healing (auto-restart on crash, ~30s recovery) |
 | **RTO** (Recovery Time Objective) | < 5 min | Pod restart: ~30s. Node failure: ~2-3 min (autoscaler provisions new node) |
 | **RPO** (Recovery Point Objective) | 24 hours | Cloud SQL daily backup (Odoo). MariaDB CronJob daily backup to GCS (Moodle) |
-| **Scaling** | 50 concurrent Moodle users | HPA: 1→3 pods at 70% CPU. GKE: 1→2 nodes. |
+| **Scaling** | 50 concurrent Moodle users | HPA: 1→3 pods at 70% CPU. GKE: 1→3 nodes. |
 
 ### Cost Optimization
 
@@ -198,10 +198,10 @@ Node 1              Node 1                          Node 1              Node 2
 |----------|------|-------------------|
 | GKE cluster (zonal) | Free management fee | $0 |
 | 1x e2-medium node | 2 vCPU, 4GB | ~$25 |
-| 2nd node (autoscaled, part-time) | 2 vCPU, 4GB | ~$5-15 |
+| 2nd-3rd node (autoscaled, part-time) | 2 vCPU, 4GB each | ~$5-25 |
 | Cloud SQL db-f1-micro | Shared vCPU, 614MB | ~$8 |
 | Storage (PVs + backups) | ~30GB total | ~$3 |
-| **Total (est.)** | | **~$40-50/month** |
+| **Total (est.)** | | **~$40-60/month** |
 
 > Shutdown policy: Scale node pool to 0 or delete cluster when not in use. Redeploy via GitHub Actions in minutes.
 
@@ -267,7 +267,7 @@ kubectl get applications -n argocd
 
 # Get Cloud SQL private IP and update Odoo config
 gcloud sql instances describe esmos-healthcare-postgres --format="value(ipAddresses[0].ipAddress)"
-# Copy the IP, then update kubernetes/odoo/values.yaml → externalDatabase.host with this IP
+# Copy the IP, then update kubernetes/odoo/deployment.yaml → HOST env var with this IP
 # Push the change — ArgoCD will auto-sync Odoo with the correct DB connection
 ```
 
@@ -301,8 +301,8 @@ This creates a daily backup job that dumps MariaDB to the GCS bucket at 2am SGT.
 
 ### Step 8: Set up Odoo Helpdesk
 
-> Note: Bitnami's community Odoo does not include the Helpdesk module (Enterprise only).
-> Use the built-in **Helpdesk** alternative or install a free helpdesk app from the Odoo App Store.
+> Note: Odoo Community Edition does not include the Enterprise Helpdesk module.
+> Use the built-in **Helpdesk** alternative or install a free helpdesk/ticketing app from the Odoo App Store.
 
 1. Login to Odoo → **Apps** menu
 2. Search for a helpdesk/ticketing app → click **Install**
@@ -399,8 +399,7 @@ Rollback: Revert the git commit → ArgoCD auto-syncs to previous state.
 |---------|------|---------|
 | GCP region | `terraform/provider.tf` | `asia-southeast1` (Singapore) |
 | Node size | `terraform/gke.tf` | `e2-medium` (2 vCPU, 4GB) |
-| Node count | `terraform/gke.tf` | 1-2 (autoscaling) |
-| Moodle replicas | `kubernetes/moodle/values.yaml` | 1 (HPA scales to 3) |
-| Moodle allowed IPs | `kubernetes/moodle/values.yaml` | `116.87.48.126/32` (your IP) |
+| Node count | `terraform/gke.tf` | 1-3 (autoscaling) |
+| Moodle replicas | `kubernetes/moodle/deployment.yaml` | 1 (HPA scales to 3) |
 | Grafana password | `terraform/helm.tf` | `esmos-admin` |
 | Backup schedule | `kubernetes/moodle/backup-cronjob.yaml` | Daily at 2am |

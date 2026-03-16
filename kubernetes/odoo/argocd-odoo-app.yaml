@@ -8,16 +8,10 @@ metadata:
 spec:
   project: default
 
-  sources:
-    - chart: odoo
-      repoURL: registry-1.docker.io/bitnamicharts
-      targetRevision: "28.0.0"
-      helm:
-        valueFiles:
-          - $values/kubernetes/odoo/values.yaml
-    - repoURL: https://github.com/JarudeC/esmos-healthcare-devsecops-platform.git
-      targetRevision: main
-      ref: values
+  source:
+    repoURL: https://github.com/JarudeC/esmos-healthcare-devsecops-platform.git
+    targetRevision: main
+    path: kubernetes/odoo
 
   destination:
     server: https://kubernetes.default.svc
