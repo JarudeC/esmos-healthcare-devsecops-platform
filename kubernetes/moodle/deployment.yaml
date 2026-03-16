@@ -100,28 +100,46 @@ spec:
     spec:
       containers:
         - name: moodle
-          image: docker.io/bitnamilegacy/moodle:4.3.4-debian-12-r5
+          image: moodlehq/moodle-php-apache:8.3
           ports:
-            - containerPort: 8080
+            - containerPort: 80
           env:
-            - name: MOODLE_DATABASE_TYPE
+            - name: MOODLE_DOCKER_DBTYPE
               value: "mariadb"
-            - name: MOODLE_DATABASE_HOST
+            - name: MOODLE_DOCKER_DBHOST
               value: "mariadb"
-            - name: MOODLE_DATABASE_PORT_NUMBER
-              value: "3306"
-            - name: MOODLE_DATABASE_NAME
+            - name: MOODLE_DOCKER_DBNAME
               value: "moodle"
-            - name: MOODLE_DATABASE_USER
-              value: "moodle"
-            - name: MOODLE_DATABASE_PASSWORD
-              value: "esmos-moodle-db"
-            - name: MOODLE_USERNAME
-              value: "admin"
-            - name: MOODLE_PASSWORD
-              value: "esmos-admin"
-            - name: MOODLE_SITE_NAME
-              value: "ESMOS Healthcare Training"
+            - name: MOODLE_DOCKER_DBUSER
+              value: "root"
+            - name: MOODLE_DOCKER_DBPASS
+              value: "esmos-mariadb-root"
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              apt-get update && apt-get install -y git
+              cd /var/www/html
+              if [ ! -f config.php ]; then
+                git clone --depth 1 --branch MOODLE_405_STABLE https://github.com/moodle/moodle.git .
+                mkdir -p /var/www/moodledata
+                chmod 777 /var/www/moodledata
+                php admin/cli/install.php \
+                  --wwwroot=http://localhost:8080 \
+                  --dataroot=/var/www/moodledata \
+                  --dbtype=mariadb \
+                  --dbhost=mariadb \
+                  --dbname=moodle \
+                  --dbuser=root \
+                  --dbpass=esmos-mariadb-root \
+                  --fullname="ESMOS Healthcare Training" \
+                  --shortname="ESMOS" \
+                  --adminuser=admin \
+                  --adminpass=esmos-admin \
+                  --adminemail=admin@esmos.local \
+                  --non-interactive \
+                  --agree-license
+              fi
+              apache2ctl -D FOREGROUND
           resources:
             requests:
               cpu: 100m
@@ -131,16 +149,16 @@ spec:
               memory: 2Gi
           startupProbe:
             tcpSocket:
-              port: 8080
-            failureThreshold: 30
+              port: 80
+            failureThreshold: 60
             periodSeconds: 30
           livenessProbe:
             tcpSocket:
-              port: 8080
+              port: 80
             periodSeconds: 30
           readinessProbe:
             tcpSocket:
-              port: 8080
+              port: 80
             periodSeconds: 10
       volumes: []
 ---
@@ -155,7 +173,7 @@ spec:
     app: moodle
   ports:
     - port: 8080
-      targetPort: 8080
+      targetPort: 80
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
