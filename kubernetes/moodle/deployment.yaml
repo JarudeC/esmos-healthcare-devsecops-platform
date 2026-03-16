@@ -100,7 +100,7 @@ spec:
     spec:
       containers:
         - name: moodle
-          image: docker.io/bitnamilegacy/moodle:4.5.4-debian-12-r0
+          image: docker.io/bitnamilegacy/moodle:4.3.4-debian-12-r5
           ports:
             - containerPort: 8080
           env:
@@ -125,13 +125,10 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 256Mi
+              memory: 512Mi
             limits:
-              cpu: 500m
-              memory: 1Gi
-          volumeMounts:
-            - name: moodle-data
-              mountPath: /bitnami/moodledata
+              cpu: "1"
+              memory: 2Gi
           startupProbe:
             tcpSocket:
               port: 8080
@@ -145,10 +142,7 @@ spec:
             tcpSocket:
               port: 8080
             periodSeconds: 10
-      volumes:
-        - name: moodle-data
-          persistentVolumeClaim:
-            claimName: moodle-data
+      volumes: []
 ---
 apiVersion: v1
 kind: Service
