@@ -6,6 +6,11 @@ A Service Management platform for Healthcare, deploying **Odoo** (ERP/Operations
 
 The platform is already deployed. To access the services:
 
+### Option A: Direct Access (requires gcloud + kubectl)
+
+> Your Google account must be granted access to the GCP project first. Ask the project admin to run:
+> `gcloud projects add-iam-policy-binding esmos-healthcare --member="user:YOUR_EMAIL" --role="roles/container.developer"`
+
 1. **Install tools** (one-time):
    - [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`winget install Google.CloudSDK` on Windows)
    - After install, run: `gcloud components install gke-gcloud-auth-plugin`
@@ -33,6 +38,25 @@ The platform is already deployed. To access the services:
    # ArgoCD → https://localhost:8443
    kubectl port-forward svc/argocd-server -n argocd 8443:443
    ```
+
+### Option B: Shared Access via Hotspot (no tools needed for other devices)
+
+This simulates a private corporate network. One person (the host) runs the port-forward commands, and everyone else on the same network accesses the services via the host's IP.
+
+1. **Host** connects to a mobile hotspot (or any shared WiFi)
+2. **Host** finds their IP: run `ipconfig` on Windows, look for the WiFi adapter's IPv4 address (e.g. `192.168.x.x`)
+3. **Host** runs port-forward with `--address 0.0.0.0` (each in its own terminal):
+   ```bash
+   kubectl port-forward svc/odoo -n odoo 8069:8069 --address 0.0.0.0
+   kubectl port-forward svc/moodle -n moodle 8080:8080 --address 0.0.0.0
+   kubectl port-forward svc/osticket -n osticket 8888:8888 --address 0.0.0.0
+   kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80 --address 0.0.0.0
+   ```
+4. **Other devices** connect to the same hotspot/WiFi and open:
+   - Odoo → `http://192.168.x.x:8069`
+   - Moodle → `http://192.168.x.x:8080`
+   - osTicket → `http://192.168.x.x:8888`
+   - Grafana → `http://192.168.x.x:3000`
 
 > All services share the same backend — any changes you make are visible to everyone.
 
