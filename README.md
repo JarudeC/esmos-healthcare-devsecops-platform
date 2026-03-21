@@ -69,46 +69,46 @@ GitHub Actions (CI/CD)
 │  │  └── osticket-backups/     (Daily MariaDB dumps, 7-day retention)        │   │
 │  └──────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                 │
-│  ┌─── VPC: esmos-healthcare-vpc (10.0.0.0/16) ─────────────────────────────┐   │
+│  ┌─── VPC: esmos-healthcare-vpc (10.0.0.0/16) ──────────────────────────────┐   │
 │  │                                                                          │   │
-│  │  ┌─── gke-subnet (10.0.1.0/24) ── PRIVATE ──────────────────────────┐   │   │
-│  │  │  Pods: 10.10.0.0/16    Services: 10.20.0.0/16                    │   │   │
+│  │  ┌─── gke-subnet (10.0.1.0/24) ── PRIVATE ───────────────────────────┐   │   │
+│  │  │  Pods: 10.10.0.0/16    Services: 10.20.0.0/16                     │   │   │
 │  │  │                                                                   │   │   │
-│  │  │  ┌─── GKE Node 1 (e2-medium: 2 vCPU, 4GB) ── No Public IP ───┐  │   │   │
+│  │  │  ┌─── GKE Node 1 (e2-medium: 2 vCPU, 4GB) ── No Public IP ─────┐  │   │   │
 │  │  │  │                                                             │  │   │   │
-│  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │  │   │   │
-│  │  │  │  │ Odoo Pod     │  │ Moodle Pod   │  │ osTicket Pod     │  │  │   │   │
-│  │  │  │  │ (1 replica)  │  │ (1 replica)  │  │ (Helpdesk)       │  │  │   │   │
-│  │  │  │  │ Port: 8069   │  │ Port: 8080   │  │ Port: 8888       │  │  │   │   │
-│  │  │  │  └──────┬───────┘  └──────┬───────┘  └──────┬───────────┘  │  │   │   │
+│  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │  │   │   │
+│  │  │  │  │ Odoo Pod     │  │ Moodle Pod   │  │ osTicket Pod     │   │  │   │   │
+│  │  │  │  │ (1 replica)  │  │ (1 replica)  │  │ (Helpdesk)       │   │  │   │   │
+│  │  │  │  │ Port: 8069   │  │ Port: 8080   │  │ Port: 8888       │   │  │   │   │
+│  │  │  │  └──────┬───────┘  └──────┬───────┘  └──────┬───────────┘   │  │   │   │
 │  │  │  │         │                 │                  │              │  │   │   │
-│  │  │  │         │          ┌──────┴───────┐  ┌───────┴──────────┐  │  │   │   │
-│  │  │  │         │          │ MariaDB Pod  │  │ MariaDB Pod      │  │  │   │   │
-│  │  │  │         │          │ (Moodle DB)  │  │ (osTicket DB)    │  │  │   │   │
-│  │  │  │         │          │ → GCS backup │  │ → GCS backup     │  │  │   │   │
-│  │  │  │         │          └──────────────┘  └──────────────────┘  │  │   │   │
-│  │  │  │         │                                                  │  │   │   │
-│  │  │  │         └──→ connects to Cloud SQL (db-subnet below)       │  │   │   │
+│  │  │  │         │          ┌──────┴───────┐  ┌───────┴──────────┐   │  │   │   │
+│  │  │  │         │          │ MariaDB Pod  │  │ MariaDB Pod      │   │  │   │   │
+│  │  │  │         │          │ (Moodle DB)  │  │ (osTicket DB)    │   │  │   │   │
+│  │  │  │         │          │ → GCS backup │  │ → GCS backup     │   │  │   │   │
+│  │  │  │         │          └──────────────┘  └──────────────────┘   │  │   │   │
+│  │  │  │         │                                                   │  │   │   │
+│  │  │  │         └──→ connects to Cloud SQL (db-subnet below)        │  │   │   │
 │  │  │  │                                                             │  │   │   │
-│  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │  │   │   │
-│  │  │  │  │ ArgoCD       │  │ Prometheus   │  │ Grafana          │  │  │   │   │
-│  │  │  │  │ (GitOps)     │  │ (Metrics)    │  │ (Dashboards)     │  │  │   │   │
-│  │  │  │  └──────────────┘  └──────────────┘  └──────────────────┘  │  │   │   │
+│  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │  │   │   │
+│  │  │  │  │ ArgoCD       │  │ Prometheus   │  │ Grafana          │   │  │   │   │
+│  │  │  │  │ (GitOps)     │  │ (Metrics)    │  │ (Dashboards)     │   │  │   │   │
+│  │  │  │  └──────────────┘  └──────────────┘  └──────────────────┘   │  │   │   │
 │  │  │  └─────────────────────────────────────────────────────────────┘  │   │   │
 │  │  │                                                                   │   │   │
-│  │  │  ┌─── GKE Node 2-3 (autoscaled when needed) ──────────────────┐  │   │   │
+│  │  │  ┌─── GKE Node 2-3 (autoscaled when needed) ───────────────────┐  │   │   │
 │  │  │  │  Provisioned by Cluster Autoscaler when pods can't fit      │  │   │   │
 │  │  │  │  on Node 1. Max 3 nodes. Removed when no longer needed.     │  │   │   │
 │  │  │  └─────────────────────────────────────────────────────────────┘  │   │   │
 │  │  │                                                                   │   │   │
-│  │  │  ┌─── Moodle Pod #2-3 (HPA scaled, when CPU >70%) ────────────┐  │   │   │
+│  │  │  ┌─── Moodle Pod #2-3 (HPA scaled, when CPU >70%) ─────────────┐  │   │   │
 │  │  │  │  Scheduled on Node 2-3 when Node 1 is full                  │  │   │   │
 │  │  │  └─────────────────────────────────────────────────────────────┘  │   │   │
 │  │  └───────────────────────────────────────────────────────────────────┘   │   │
 │  │         │                                                                │   │
 │  │         │ Private Service Access (VPC Peering)                           │   │
 │  │         ▼                                                                │   │
-│  │  ┌─── db-subnet (10.0.2.0/24) ── PRIVATE ───────────────────────────┐   │   │
+│  │  ┌─── db-subnet (10.0.2.0/24) ── PRIVATE ────────────────────────────┐   │   │
 │  │  │                                                                   │   │   │
 │  │  │  ┌─────────────────────────────────────────────────────────────┐  │   │   │
 │  │  │  │  Cloud SQL (PostgreSQL 15)                                  │  │   │   │
@@ -119,8 +119,8 @@ GitHub Actions (CI/CD)
 │  │  └───────────────────────────────────────────────────────────────────┘   │   │
 │  │                                                                          │   │
 │  │  ┌─── Firewall Rules ────────────────────────────────────────────────┐   │   │
-│  │  │  DENY   all inbound from 0.0.0.0/0 to tag:gke-node (pri 1000)   │   │   │
-│  │  │  ALLOW  all internal traffic from 10.0.0.0/8          (pri 900)  │   │   │
+│  │  │  DENY   all inbound from 0.0.0.0/0 to tag:gke-node (pri 1000)     │   │   │
+│  │  │  ALLOW  all internal traffic from 10.0.0.0/8          (pri 900)   │   │   │
 │  │  └───────────────────────────────────────────────────────────────────┘   │   │
 │  │                                                                          │   │
 │  │  ┌─── Access (No public endpoint) ───────────────────────────────────┐   │   │
@@ -132,7 +132,7 @@ GitHub Actions (CI/CD)
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-┌─── External Services (outside GCP) ─────────────────────────────────────────────┐
+┌─── External Services (outside GCP) ──────────────────────────────────────────────┐
 │                                                                                  │
 │  GitHub Repository                     GitHub Actions                            │
 │  ├── /terraform/*                      ├── PR → terraform plan (RFC)             │
@@ -156,8 +156,8 @@ Node 1              Node 1                          Node 1              Node 2  
 │ Odoo    x1 │      │ Odoo    x1 │     HPA          │ Odoo    x1 │      │ Moodle  x1 │  │ Moodle  x1 │
 │ Moodle  x1 │  ──→ │ Moodle  x1 │  ──scales──→     │ Moodle  x1 │      │ MariaDB x2 │  │            │
 │ osTicket   │      │ osTicket   │   to 3 pods      │ osTicket   │      │            │  │            │
-│ ArgoCD     │      │ ArgoCD     │                   │ ArgoCD     │      │            │  │            │
-│ Monitoring │      │ Monitoring │                   │ Monitoring │      │            │  │            │
+│ ArgoCD     │      │ ArgoCD     │                  │ ArgoCD     │      │            │  │            │
+│ Monitoring │      │ Monitoring │                  │ Monitoring │      │            │  │            │
 └────────────┘      └────────────┘                  └────────────┘      └────────────┘  └────────────┘
   CPU: 30%            CPU: 70%+                        CPU: 50%            CPU: 40%       CPU: 30%
 
