@@ -27,6 +27,9 @@ The platform is already deployed. To access the services:
    # Grafana → http://localhost:3000 (admin / esmos-admin)
    kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
 
+   # osTicket Helpdesk → http://localhost:8888
+   kubectl port-forward svc/osticket -n osticket 8888:8888
+
    # ArgoCD → https://localhost:8443
    kubectl port-forward svc/argocd-server -n argocd 8443:443
    ```
@@ -172,11 +175,14 @@ Node 1              Node 1                          Node 1              Node 2  
     ├── odoo/
     │   ├── deployment.yaml              # Odoo Deployment, Service, PVCs (official image)
     │   └── argocd-odoo-app.yaml         # ArgoCD Application CRD for Odoo
-    └── moodle/
-        ├── deployment.yaml              # Moodle + MariaDB Deployments, Services, HPA, PVCs
-        ├── argocd-moodle-app.yaml       # ArgoCD Application CRD for Moodle
-        ├── backup-cronjob.yaml          # Daily MariaDB backup to GCS
-        └── restore.sh                   # Restore from backup
+    ├── moodle/
+    │   ├── deployment.yaml              # Moodle + MariaDB Deployments, Services, HPA, PVCs
+    │   ├── argocd-moodle-app.yaml       # ArgoCD Application CRD for Moodle
+    │   ├── backup-cronjob.yaml          # Daily MariaDB backup to GCS
+    │   └── restore.sh                   # Restore from backup
+    └── osticket/
+        ├── deployment.yaml              # osTicket + MariaDB Deployments, Services, PVCs
+        └── argocd-osticket-app.yaml     # ArgoCD Application CRD for osTicket
 ```
 
 ## Service Design
@@ -186,18 +192,18 @@ Node 1              Node 1                          Node 1              Node 2  
 | System | Purpose | Users | Access |
 |--------|---------|-------|--------|
 | **Odoo** | Meal plan inventory & operations | Operations staff (post-training) | Internal, authenticated |
-| **Helpdesk** (Odoo app or alternative) | Centralized support across Odoo & Moodle | Support managers, all staff | Internal, role-based |
+| **osTicket** | Centralized helpdesk across Odoo & Moodle | Support managers, all staff | Internal, role-based |
 | **Moodle** | Mandatory compliance training (500+ staff) | All healthcare staff | Internal only, port-forward access |
 | **Grafana** | Live monitoring dashboard | SRE / operations team | Internal, port-forwarded |
 
 ### Service Integration Workflow
 
 ```
-1. New staff requests access          → Helpdesk ticket created in Odoo
+1. New staff requests access          → Helpdesk ticket created in osTicket
 2. Support manager assigns training   → Links staff to Moodle compliance course
-3. Staff completes course in Moodle   → Submits completion proof to Helpdesk ticket
+3. Staff completes course in Moodle   → Submits completion proof to osTicket ticket
 4. Support manager verifies           → Creates Odoo account, notifies staff
-5. Ticket closed                      → Full audit trail in Helpdesk
+5. Ticket closed                      → Full audit trail in osTicket
 ```
 
 ### Infrastructure Design Decisions
@@ -326,6 +332,9 @@ kubectl port-forward svc/odoo -n odoo 8069:8069
 # Moodle → http://localhost:8080 (admin / esmos-admin)
 kubectl port-forward svc/moodle -n moodle 8080:8080
 
+# osTicket Helpdesk → http://localhost:8888
+kubectl port-forward svc/osticket -n osticket 8888:8888
+
 # Grafana → http://localhost:3000 (admin / esmos-admin)
 kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
 
@@ -338,8 +347,14 @@ kubectl port-forward svc/argocd-server -n argocd 8443:443
 ### Step 8: Set up Odoo
 
 1. On first access, Odoo shows a database creation page — fill in the form and click **Create Database**
-2. Go to **Apps** menu → search for a helpdesk/ticketing app → click **Install**
-3. Configure helpdesk teams and SLA policies
+2. Install apps you need from the **Apps** menu (e.g. Inventory, Project)
+
+### Step 9: Set up osTicket Helpdesk
+
+1. Access osTicket at http://localhost:8888
+2. Complete the web-based setup wizard
+3. Configure departments, help topics, and SLA plans
+4. Add links to Moodle and Odoo in the helpdesk knowledge base
 
 ## Backups and Recovery
 
@@ -408,7 +423,7 @@ You can also teardown from GitHub without the CLI:
 | **CI/CD auth** | Workload Identity Federation — no stored credentials, OIDC-based |
 | **Backups** | Cloud SQL daily (Odoo), CronJob daily to GCS (Moodle), 7-day retention |
 | **Monitoring** | Prometheus metrics + Grafana dashboards for uptime and resource usage |
-| **Audit trail** | ArgoCD sync history, Git commit history, Helpdesk ticket trail |
+| **Audit trail** | ArgoCD sync history, Git commit history, osTicket ticket trail |
 | **Change management** | PR-based RFC workflow: plan on PR, apply on merge |
 
 ## Change Management (RFC Workflow)
