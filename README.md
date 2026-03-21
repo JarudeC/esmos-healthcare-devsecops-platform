@@ -89,8 +89,8 @@ GitHub Actions (CI/CD)
 │  ┌─── GCS Bucket (outside VPC) ─────────────────────────────────────────────┐   │
 │  │  gs://esmos-healthcare-tfstate                                           │   │
 │  │  ├── terraform/state/      (Terraform state)                             │   │
-│  │  ├── moodle-backups/       (Daily MariaDB dumps, 7-day retention)        │   │
-│  │  └── osticket-backups/     (Daily MariaDB dumps, 7-day retention)        │   │
+│  │  ├── moodle-backups/       (12-hourly MariaDB dumps, 7-day retention)     │   │
+│  │  └── osticket-backups/     (12-hourly MariaDB dumps, 7-day retention)    │   │
 │  └──────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                 │
 │  ┌─── VPC: esmos-healthcare-vpc (10.0.0.0/16) ──────────────────────────────┐   │
@@ -246,7 +246,8 @@ Node 1              Node 1                          Node 1              Node 2  
 | **Region** | `asia-southeast1` (Singapore) | Data residency compliance for healthcare client |
 | **Cluster** | GKE, 1-3 nodes, e2-medium | Cost-effective (free zonal cluster management), autoscales only when load demands it |
 | **Database** | Cloud SQL db-f1-micro | Cheapest tier with automated daily backups and private networking |
-| **Moodle DB** | Bundled MariaDB + daily CronJob backup to GCS | Avoids cost of a second Cloud SQL instance; RPO ~24h |
+| **Moodle DB** | Bundled MariaDB + daily CronJob backup to GCS | Avoids cost of a second Cloud SQL instance; RPO ~12h |
+| **osTicket DB** | Bundled MariaDB + daily CronJob backup to GCS | Same pattern as Moodle; RPO ~12h |
 | **Replicas** | 1 per service, HPA scales Moodle to 3 under load | Balances cost and availability — idle replicas waste credits |
 | **GitOps** | ArgoCD | Auto-syncs app config from Git, provides rollback UI and audit trail |
 | **Monitoring** | Prometheus + Grafana | Live uptime dashboard, resource metrics, alerting capability |
@@ -258,7 +259,7 @@ Node 1              Node 1                          Node 1              Node 2  
 |--------|--------|-----|
 | **Uptime SLA** | 99.5% | Kubernetes self-healing (auto-restart on crash, ~30s recovery) |
 | **RTO** (Recovery Time Objective) | < 5 min | Pod restart: ~30s. Node failure: ~2-3 min (autoscaler provisions new node) |
-| **RPO** (Recovery Point Objective) | 24 hours | Cloud SQL daily backup (Odoo). MariaDB CronJob daily backup to GCS (Moodle) |
+| **RPO** (Recovery Point Objective) | 12 hours | Cloud SQL daily backup (Odoo). MariaDB CronJob every 12h to GCS (Moodle, osTicket) |
 | **Scaling** | 50 concurrent Moodle users | HPA: 1→3 pods at 70% CPU. GKE: 1→3 nodes. |
 
 ### Cost Optimization
@@ -395,8 +396,8 @@ kubectl port-forward svc/argocd-server -n argocd 8443:443
 | System | Method | Schedule | Retention | Location |
 |--------|--------|----------|-----------|----------|
 | Odoo (Cloud SQL) | GCP automated backup | Daily | 7 days | GCP-managed |
-| Moodle (MariaDB) | CronJob `mysqldump` | Daily at 2am SGT | 7 days | `gs://esmos-healthcare-tfstate/moodle-backups/` |
-| osTicket (MariaDB) | CronJob `mysqldump` | Daily at 3am SGT | 7 days | `gs://esmos-healthcare-tfstate/osticket-backups/` |
+| Moodle (MariaDB) | CronJob `mysqldump` | Every 12h (2am/2pm SGT) | 7 days | `gs://esmos-healthcare-tfstate/moodle-backups/` |
+| osTicket (MariaDB) | CronJob `mysqldump` | Every 12h (3am/3pm SGT) | 7 days | `gs://esmos-healthcare-tfstate/osticket-backups/` |
 
 ### Restore Moodle from Backup
 
@@ -454,7 +455,7 @@ You can also teardown from GitHub without the CLI:
 | **Access control** | No public endpoints; access via `kubectl port-forward` from authorized machines only. Odoo access requires training completion |
 | **Least privilege** | Pod security contexts enforced, minimal resource requests |
 | **CI/CD auth** | Workload Identity Federation — no stored credentials, OIDC-based |
-| **Backups** | Cloud SQL daily (Odoo), CronJob daily to GCS (Moodle), 7-day retention |
+| **Backups** | Cloud SQL daily (Odoo), CronJob every 12h to GCS (Moodle, osTicket), 7-day retention |
 | **Monitoring** | Prometheus metrics + Grafana dashboards for uptime and resource usage |
 | **Audit trail** | ArgoCD sync history, Git commit history, osTicket ticket trail |
 | **Change management** | PR-based RFC workflow: plan on PR, apply on merge |
@@ -483,4 +484,4 @@ Rollback: Revert the git commit → ArgoCD auto-syncs to previous state.
 | Node count | `terraform/gke.tf` | 1-3 (autoscaling) |
 | Moodle replicas | `kubernetes/moodle/deployment.yaml` | 1 (HPA scales to 3) |
 | Grafana password | `terraform/helm.tf` | `esmos-admin` |
-| Backup schedule | `kubernetes/moodle/backup-cronjob.yaml` | Daily at 2am |
+| Backup schedule | `kubernetes/moodle/backup-cronjob.yaml` | Every 12h (2am/2pm SGT) |

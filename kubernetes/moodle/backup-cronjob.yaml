@@ -4,7 +4,7 @@ metadata:
   name: moodle-mariadb-backup
   namespace: moodle
 spec:
-  schedule: "0 2 * * *"  # Daily at 2am SGT
+  schedule: "0 2,14 * * *"  # Every 12 hours at 2am and 2pm SGT
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   jobTemplate:

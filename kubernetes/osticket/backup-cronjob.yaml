@@ -4,7 +4,7 @@ metadata:
   name: osticket-mariadb-backup
   namespace: osticket
 spec:
-  schedule: "0 3 * * *"  # Daily at 3am SGT (staggered from Moodle at 2am)
+  schedule: "0 3,15 * * *"  # Every 12 hours at 3am and 3pm SGT (staggered from Moodle)
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   jobTemplate:
