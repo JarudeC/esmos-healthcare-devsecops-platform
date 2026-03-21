@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
         - name: osticket
-          image: osticket/osticket:v1.18.1
+          image: devinsolutions/osticket:1.17.5
           ports:
             - containerPort: 80
           env:
