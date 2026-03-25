@@ -46,13 +46,19 @@ spec:
             - containerPort: 3306
           env:
             - name: MARIADB_ROOT_PASSWORD
-              value: "esmos-mariadb-root"
+              valueFrom:
+                secretKeyRef:
+                  name: moodle-mariadb
+                  key: mariadb-root-password
             - name: MARIADB_DATABASE
               value: "moodle"
             - name: MARIADB_USER
               value: "moodle"
             - name: MARIADB_PASSWORD
-              value: "esmos-moodle-db"
+              valueFrom:
+                secretKeyRef:
+                  name: moodle-mariadb
+                  key: mariadb-password
           resources:
             requests:
               cpu: 100m
@@ -113,7 +119,10 @@ spec:
             - name: MOODLE_DOCKER_DBUSER
               value: "root"
             - name: MOODLE_DOCKER_DBPASS
-              value: "esmos-mariadb-root"
+              valueFrom:
+                secretKeyRef:
+                  name: moodle-mariadb
+                  key: mariadb-root-password
             - name: APACHE_DOCUMENT_ROOT
               value: "/var/www/html"
           command: ["/bin/bash", "-c"]
@@ -132,7 +141,7 @@ spec:
                   --dbhost=mariadb \
                   --dbname=moodle \
                   --dbuser=root \
-                  --dbpass=esmos-mariadb-root \
+                  --dbpass="$MOODLE_DOCKER_DBPASS" \
                   --fullname="ESMOS Healthcare Training" \
                   --shortname="ESMOS" \
                   --adminuser=admin \
