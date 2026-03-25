@@ -46,7 +46,7 @@ spec:
             - name: INSTALL_EMAIL
               value: "helpdesk@esmos-healthcare.local"
             - name: SMTP_HOST
-              value: "smtp.office365.com"
+              value: "smtp.gmail.com"
             - name: SMTP_PORT
               value: "587"
             - name: SMTP_TLS
