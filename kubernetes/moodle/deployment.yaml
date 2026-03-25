@@ -119,17 +119,18 @@ spec:
             - name: MOODLE_DOCKER_DBNAME
               value: "moodle"
             - name: MOODLE_DOCKER_DBUSER
-              value: "root"
+              value: "moodle"
             - name: MOODLE_DOCKER_DBPASS
               valueFrom:
                 secretKeyRef:
                   name: moodle-mariadb
-                  key: mariadb-root-password
+                  key: mariadb-password
             - name: APACHE_DOCUMENT_ROOT
               value: "/var/www/html"
           command: ["/bin/bash", "-c"]
           args:
             - |
+              set -e
               apt-get update && apt-get install -y git
               cd /var/www/html
               if [ ! -f config.php ]; then
@@ -142,7 +143,7 @@ spec:
                   --dbtype=mariadb \
                   --dbhost=mariadb \
                   --dbname=moodle \
-                  --dbuser=root \
+                  --dbuser="$MOODLE_DOCKER_DBUSER" \
                   --dbpass="$MOODLE_DOCKER_DBPASS" \
                   --fullname="ESMOS Healthcare Training" \
                   --shortname="ESMOS" \
