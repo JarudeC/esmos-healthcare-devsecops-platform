@@ -123,6 +123,30 @@ jobs:
         env:
           USE_GKE_GCLOUD_AUTH_PLUGIN: "True"
 
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials esmos-healthcare-gke \
+            --zone asia-southeast1-a \
+            --project "${{ secrets.GCP_PROJECT_ID }}"
+
+      - name: Create osTicket SMTP secret
+        run: |
+          kubectl create namespace osticket --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic osticket-smtp -n osticket \
+            --from-literal=from="${{ secrets.OSTICKET_SMTP_FROM }}" \
+            --from-literal=username="${{ secrets.OSTICKET_SMTP_USER }}" \
+            --from-literal=password="${{ secrets.OSTICKET_SMTP_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create Odoo SMTP secret
+        run: |
+          kubectl create namespace odoo --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic odoo-smtp -n odoo \
+            --from-literal=from="${{ secrets.ODOO_SMTP_FROM }}" \
+            --from-literal=username="${{ secrets.ODOO_SMTP_USER }}" \
+            --from-literal=password="${{ secrets.ODOO_SMTP_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
   # ───────────────────────────────────────────────
   # Destroy Phase: Manual trigger only
   # ───────────────────────────────────────────────
