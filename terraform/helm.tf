@@ -50,12 +50,12 @@ resource "helm_release" "argocd" {
   # Resource limits for e2-medium nodes
   set {
     name  = "controller.resources.requests.memory"
-    value = "128Mi"
+    value = "256Mi"
   }
 
   set {
     name  = "controller.resources.limits.memory"
-    value = "256Mi"
+    value = "512Mi"
   }
 
   set {

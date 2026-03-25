@@ -133,18 +133,18 @@ jobs:
         run: |
           kubectl create namespace osticket --dry-run=client -o yaml | kubectl apply -f -
           kubectl create secret generic osticket-smtp -n osticket \
-            --from-literal=from="${{ secrets.OSTICKET_SMTP_FROM }}" \
-            --from-literal=username="${{ secrets.OSTICKET_SMTP_USER }}" \
-            --from-literal=password="${{ secrets.OSTICKET_SMTP_PASSWORD }}" \
+            --from-literal=from="${{ secrets.SMTP_FROM }}" \
+            --from-literal=username="${{ secrets.SMTP_USER }}" \
+            --from-literal=password="${{ secrets.SMTP_PASSWORD }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Create Odoo SMTP secret
         run: |
           kubectl create namespace odoo --dry-run=client -o yaml | kubectl apply -f -
           kubectl create secret generic odoo-smtp -n odoo \
-            --from-literal=from="${{ secrets.ODOO_SMTP_FROM }}" \
-            --from-literal=username="${{ secrets.ODOO_SMTP_USER }}" \
-            --from-literal=password="${{ secrets.ODOO_SMTP_PASSWORD }}" \
+            --from-literal=from="${{ secrets.SMTP_FROM }}" \
+            --from-literal=username="${{ secrets.SMTP_USER }}" \
+            --from-literal=password="${{ secrets.SMTP_PASSWORD }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
   # ───────────────────────────────────────────────
