@@ -159,7 +159,7 @@ spec:
                 'dbsocket' => '',
                 'dbcollation' => 'utf8mb4_unicode_ci',
               );
-              \$CFG->wwwroot = 'http://localhost:8080';
+              \$CFG->wwwroot = 'http://localhost:8888';
               \$CFG->dataroot = '/var/www/moodledata';
               \$CFG->admin = 'admin';
               \$CFG->directorypermissions = 02777;
@@ -169,7 +169,7 @@ spec:
               EOF
               else
                 php admin/cli/install.php \
-                  --wwwroot=http://localhost:8080 \
+                  --wwwroot=http://localhost:8888 \
                   --dataroot=/var/www/moodledata \
                   --dbtype=mariadb \
                   --dbhost=mariadb \
@@ -184,7 +184,7 @@ spec:
                   --non-interactive \
                   --agree-license
                 echo "\$CFG->sslproxy = false;" >> /var/www/html/config.php
-                sed -i "s|'wwwroot'.*|'wwwroot'   => 'http://localhost:8080',|" /var/www/html/config.php
+                sed -i "s|'wwwroot'.*|'wwwroot'   => 'http://localhost:8888',|" /var/www/html/config.php
               fi
               chown -R www-data:www-data /var/www/html /var/www/moodledata
               apache2ctl -D FOREGROUND
@@ -220,7 +220,7 @@ spec:
   selector:
     app: moodle
   ports:
-    - port: 8080
+    - port: 8888
       targetPort: 80
 ---
 apiVersion: autoscaling/v2
