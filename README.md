@@ -26,14 +26,14 @@ The platform is already deployed. To access the services:
    # Odoo → http://localhost:8069
    kubectl port-forward svc/odoo -n odoo 8069:8069
 
-   # Moodle → http://localhost:8080 (admin / esmos-admin)
-   kubectl port-forward svc/moodle -n moodle 8080:8080
+   # Moodle → http://localhost:8888 (admin / esmos-admin)
+   kubectl port-forward svc/moodle -n moodle 8888:8888
 
    # Grafana → http://localhost:3000 (admin / esmos-admin)
    kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
 
-   # osTicket Helpdesk → http://localhost:8888
-   kubectl port-forward svc/osticket -n osticket 8888:8888
+   # osTicket Helpdesk → http://localhost:8080
+   kubectl port-forward svc/osticket -n osticket 8080:8080
 
    # ArgoCD → https://localhost:8443
    kubectl port-forward svc/argocd-server -n argocd 8443:443
@@ -48,14 +48,14 @@ This simulates a private corporate network. One person (the host) runs the port-
 3. **Host** runs port-forward with `--address 0.0.0.0` (each in its own terminal):
    ```bash
    kubectl port-forward svc/odoo -n odoo 8069:8069 --address 0.0.0.0
-   kubectl port-forward svc/moodle -n moodle 8080:8080 --address 0.0.0.0
-   kubectl port-forward svc/osticket -n osticket 8888:8888 --address 0.0.0.0
+   kubectl port-forward svc/moodle -n moodle 8888:8888 --address 0.0.0.0
+   kubectl port-forward svc/osticket -n osticket 8080:8080 --address 0.0.0.0
    kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80 --address 0.0.0.0
    ```
 4. **Other devices** connect to the same hotspot/WiFi and open:
    - Odoo → `http://192.168.x.x:8069`
-   - Moodle → `http://192.168.x.x:8080`
-   - osTicket → `http://192.168.x.x:8888`
+   - Moodle → `http://192.168.x.x:8888`
+   - osTicket → `http://192.168.x.x:8080`
    - Grafana → `http://192.168.x.x:3000`
 
 > All services share the same backend — any changes you make are visible to everyone.
@@ -103,7 +103,7 @@ GitHub Actions (CI/CD)
 │  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │  │   │   │
 │  │  │  │  │ Odoo Pod     │  │ Moodle Pod   │  │ osTicket Pod     │   │  │   │   │
 │  │  │  │  │ (1 replica)  │  │ (1 replica)  │  │ (Helpdesk)       │   │  │   │   │
-│  │  │  │  │ Port: 8069   │  │ Port: 8080   │  │ Port: 8888       │   │  │   │   │
+│  │  │  │  │ Port: 8069   │  │ Port: 8888   │  │ Port: 8080       │   │  │   │   │
 │  │  │  │  └──────┬───────┘  └──────┬───────┘  └──────┬───────────┘   │  │   │   │
 │  │  │  │         │                 │                  │              │  │   │   │
 │  │  │  │         │          ┌──────┴───────┐  ┌───────┴──────────┐   │  │   │   │
@@ -362,11 +362,11 @@ Each command needs its own terminal:
 # Odoo → http://localhost:8069
 kubectl port-forward svc/odoo -n odoo 8069:8069
 
-# Moodle → http://localhost:8080 (admin / esmos-admin)
-kubectl port-forward svc/moodle -n moodle 8080:8080
+# Moodle → http://localhost:8888 (admin / esmos-admin)
+kubectl port-forward svc/moodle -n moodle 8888:8888
 
-# osTicket Helpdesk → http://localhost:8888
-kubectl port-forward svc/osticket -n osticket 8888:8888
+# osTicket Helpdesk → http://localhost:8080
+kubectl port-forward svc/osticket -n osticket 8080:8080
 
 # Grafana → http://localhost:3000 (admin / esmos-admin)
 kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
@@ -384,7 +384,7 @@ kubectl port-forward svc/argocd-server -n argocd 8443:443
 
 ### Step 9: Set up osTicket Helpdesk
 
-1. Access osTicket at http://localhost:8888
+1. Access osTicket at http://localhost:8080
 2. Complete the web-based setup wizard
 3. Configure departments, help topics, and SLA plans
 4. Add links to Moodle and Odoo in the helpdesk knowledge base

@@ -42,7 +42,7 @@ spec:
             - name: MYSQL_PASSWORD
               value: "esmos-osticket-db"
             - name: INSTALL_URL
-              value: "http://localhost:8888/"
+              value: "http://localhost:8080/"
             - name: INSTALL_EMAIL
               value: "helpdesk@esmos-healthcare.local"
             - name: SMTP_HOST
@@ -173,5 +173,5 @@ spec:
   selector:
     app: osticket
   ports:
-    - port: 8888
+    - port: 8080
       targetPort: 80
