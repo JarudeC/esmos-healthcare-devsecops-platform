@@ -41,6 +41,31 @@ spec:
               value: "osticket"
             - name: MYSQL_PASSWORD
               value: "esmos-osticket-db"
+            - name: INSTALL_URL
+              value: "http://localhost:8888/"
+            - name: INSTALL_EMAIL
+              value: "helpdesk@esmos-healthcare.local"
+            - name: SMTP_HOST
+              value: "smtp.office365.com"
+            - name: SMTP_PORT
+              value: "587"
+            - name: SMTP_TLS
+              value: "true"
+            - name: SMTP_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: osticket-smtp
+                  key: from
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: osticket-smtp
+                  key: username
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: osticket-smtp
+                  key: password
           resources:
             requests:
               cpu: 50m
