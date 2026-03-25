@@ -5,6 +5,7 @@ metadata:
   namespace: moodle
 spec:
   schedule: "0 2,14 * * *"  # Every 12 hours at 2am and 2pm SGT
+  concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   jobTemplate:
@@ -22,7 +23,7 @@ spec:
                   TIMESTAMP=$(date +%Y%m%d-%H%M%S)
                   BACKUP_FILE="/tmp/moodle-backup-${TIMESTAMP}.sql"
                   echo "Starting Moodle MariaDB backup..."
-                  mysqldump -h moodle-mariadb -u moodle -p"${MARIADB_PASSWORD}" moodle > "$BACKUP_FILE"
+                  mysqldump -h mariadb -u moodle -p"${MARIADB_PASSWORD}" moodle > "$BACKUP_FILE"
                   gcloud storage cp "$BACKUP_FILE" "gs://${BUCKET_NAME}/moodle-backups/moodle-backup-${TIMESTAMP}.sql"
                   echo "Backup uploaded to gs://${BUCKET_NAME}/moodle-backups/moodle-backup-${TIMESTAMP}.sql"
                   # Clean up backups older than 7 days
