@@ -83,7 +83,7 @@ GitHub Actions (CI/CD)
 │  ┌─── GCS Bucket (outside VPC) ─────────────────────────────────────────────┐   │
 │  │  gs://esmos-healthcare-tfstate                                           │   │
 │  │  ├── terraform/state/      (Terraform state)                             │   │
-│  │  ├── moodle-backups/       (12-hourly MariaDB dumps, 7-day retention)     │   │
+│  │  ├── moodle-backups/       (12-hourly MariaDB dumps, 7-day retention)    │   │
 │  │  └── osticket-backups/     (12-hourly MariaDB dumps, 7-day retention)    │   │
 │  └──────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                 │
@@ -93,33 +93,33 @@ GitHub Actions (CI/CD)
 │  │  │  Pods: 10.10.0.0/16    Services: 10.20.0.0/16                     │   │   │
 │  │  │                                                                   │   │   │
 │  │  │  ┌─── NGINX Ingress (LoadBalancer IP #1) ──────────────────────┐  │   │   │
-│  │  │  │  http://INGRESS_IP  → routes to Odoo (PUBLIC)              │  │   │   │
-│  │  │  └────────────────────────────────────────────────────────────┘  │   │   │
-│  │  │  ┌─── osTicket LoadBalancer (IP #2) ──────────────────────────┐  │   │   │
-│  │  │  │  http://OSTICKET_IP → routes to osTicket (PUBLIC)          │  │   │   │
-│  │  │  └────────────────────────────────────────────────────────────┘  │   │   │
+│  │  │  │  http://INGRESS_IP  → routes to Odoo (PUBLIC)               │  │   │   │
+│  │  │  └─────────────────────────────────────────────────────────────┘  │   │   │
+│  │  │  ┌─── osTicket LoadBalancer (IP #2) ──────────────────────────┐   │   │   │
+│  │  │  │  http://OSTICKET_IP → routes to osTicket (PUBLIC)          │   │   │   │
+│  │  │  └────────────────────────────────────────────────────────────┘   │   │   │
 │  │  │         │                                                         │   │   │
 │  │  │         ▼                                                         │   │   │
-│  │  │  ┌─── GKE Node 1 (e2-medium: 2 vCPU, 4GB) ── No Public IP ───┐  │   │   │
+│  │  │  ┌─── GKE Node 1 (e2-medium: 2 vCPU, 4GB) ── No Public IP ─────┐  │   │   │
 │  │  │  │                                                             │  │   │   │
-│  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │  │   │   │
-│  │  │  │  │ Odoo Pod     │  │ Moodle Pod   │  │ osTicket Pod     │  │  │   │   │
-│  │  │  │  │ (PUBLIC)     │  │ (INTERNAL)   │  │ (PUBLIC)         │  │  │   │   │
-│  │  │  │  │ Port: 8069   │  │ Port: 8888   │  │ Port: 8080      │  │  │   │   │
-│  │  │  │  └──────┬───────┘  └──────┬───────┘  └──────┬──────────┘  │  │   │   │
-│  │  │  │         │                 │                  │             │  │   │   │
-│  │  │  │         │          ┌──────┴───────┐  ┌───────┴─────────┐  │  │   │   │
-│  │  │  │         │          │ MariaDB Pod  │  │ MariaDB Pod     │  │  │   │   │
-│  │  │  │         │          │ (Moodle DB)  │  │ (osTicket DB)   │  │  │   │   │
-│  │  │  │         │          │ → GCS backup │  │ → GCS backup    │  │  │   │   │
-│  │  │  │         │          └──────────────┘  └─────────────────┘  │  │   │   │
-│  │  │  │         │                                                  │  │   │   │
-│  │  │  │         └──→ connects to Cloud SQL (db-subnet below)       │  │   │   │
+│  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │  │   │   │
+│  │  │  │  │ Odoo Pod     │  │ Moodle Pod   │  │ osTicket Pod     │   │  │   │   │
+│  │  │  │  │ (PUBLIC)     │  │ (INTERNAL)   │  │ (PUBLIC)         │   │  │   │   │
+│  │  │  │  │ Port: 8069   │  │ Port: 8888   │  │ Port: 8080       │   │  │   │   │
+│  │  │  │  └──────┬───────┘  └──────┬───────┘  └───────┬──────────┘   │  │   │   │
+│  │  │  │         │                 │                  │              │  │   │   │
+│  │  │  │         │          ┌──────┴───────┐  ┌───────┴─────────┐    │  │   │   │
+│  │  │  │         │          │ MariaDB Pod  │  │ MariaDB Pod     │    │  │   │   │
+│  │  │  │         │          │ (Moodle DB)  │  │ (osTicket DB)   │    │  │   │   │
+│  │  │  │         │          │ → GCS backup │  │ → GCS backup    │    │  │   │   │
+│  │  │  │         │          └──────────────┘  └─────────────────┘    │  │   │   │
+│  │  │  │         │                                                   │  │   │   │
+│  │  │  │         └──→ connects to Cloud SQL (db-subnet below)        │  │   │   │
 │  │  │  │                                                             │  │   │   │
-│  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │  │   │   │
-│  │  │  │  │ ArgoCD       │  │ Prometheus   │  │ Grafana          │  │  │   │   │
-│  │  │  │  │ (GitOps)     │  │ (Metrics)    │  │ (Dashboards)     │  │  │   │   │
-│  │  │  │  └──────────────┘  └──────────────┘  └──────────────────┘  │  │   │   │
+│  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │  │   │   │
+│  │  │  │  │ ArgoCD       │  │ Prometheus   │  │ Grafana          │   │  │   │   │
+│  │  │  │  │ (GitOps)     │  │ (Metrics)    │  │ (Dashboards)     │   │  │   │   │
+│  │  │  │  └──────────────┘  └──────────────┘  └──────────────────┘   │  │   │   │
 │  │  │  └─────────────────────────────────────────────────────────────┘  │   │   │
 │  │  │                                                                   │   │   │
 │  │  │  ┌─── GKE Node 2-3 (autoscaled when needed) ───────────────────┐  │   │   │
@@ -149,13 +149,13 @@ GitHub Actions (CI/CD)
 │  │  │  ALLOW  all internal traffic from 10.0.0.0/8          (pri 900)   │   │   │
 │  │  └───────────────────────────────────────────────────────────────────┘   │   │
 │  │                                                                          │   │
-│  │  ┌─── Access ───────────────────────────────────────────────────────┐   │   │
+│  │  ┌─── Access ────────────────────────────────────────────────────────┐   │   │
 │  │  │  Odoo: PUBLIC via NGINX Ingress (LoadBalancer IP #1)              │   │   │
-│  │  │  osTicket: PUBLIC via LoadBalancer (IP #2)                       │   │   │
-│  │  │  Moodle: INTERNAL only (kubectl port-forward)                    │   │   │
-│  │  │  Grafana/ArgoCD: INTERNAL only (kubectl port-forward)            │   │   │
-│  │  │  Cloud NAT: outbound internet for private nodes (image pulls)    │   │   │
-│  │  └──────────────────────────────────────────────────────────────────┘   │   │
+│  │  │  osTicket: PUBLIC via LoadBalancer (IP #2)                        │   │   │
+│  │  │  Moodle: INTERNAL only (kubectl port-forward)                     │   │   │
+│  │  │  Grafana/ArgoCD: INTERNAL only (kubectl port-forward)             │   │   │
+│  │  │  Cloud NAT: outbound internet for private nodes (image pulls)     │   │   │
+│  │  └───────────────────────────────────────────────────────────────────┘   │   │
 │  └──────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
