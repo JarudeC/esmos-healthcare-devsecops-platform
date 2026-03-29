@@ -8,18 +8,9 @@ The platform is already deployed. **Odoo** and **osTicket** are publicly accessi
 
 ### Public Services (no setup needed)
 
-Add these lines to your `hosts` file (`C:\Windows\System32\drivers\etc\hosts` on Windows, `/etc/hosts` on Mac/Linux):
-
-```
-INGRESS_IP  odoo.esmos.dev
-INGRESS_IP  helpdesk.esmos.dev
-```
-
-> Replace `INGRESS_IP` with the actual IP. To find it: `kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'`
-
-Then open in your browser:
-- **Odoo** → `http://odoo.esmos.dev`
-- **osTicket Helpdesk** → `http://helpdesk.esmos.dev`
+Open in your browser:
+- **Odoo** → `http://INGRESS_IP` (get IP: `kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'`)
+- **osTicket Helpdesk** → `http://OSTICKET_IP` (get IP: `kubectl get svc -n osticket osticket -o jsonpath='{.status.loadBalancer.ingress[0].ip}'`)
 
 ### Internal Services (requires gcloud + kubectl)
 
@@ -75,7 +66,7 @@ GitHub Actions (CI/CD)
                           ├── GKE Cluster (1-3 nodes, e2-medium, private)
                           ├── Cloud SQL PostgreSQL (private IP, daily backups)
                           ├── VPC (subnets: gke, db + private service access, Cloud NAT)
-                          ├── NGINX Ingress (1 LoadBalancer IP → Odoo + osTicket)
+                          ├── NGINX Ingress (public IP → Odoo) + osTicket LoadBalancer
                           ├── ArgoCD (GitOps controller)
                           │     ├── Syncs → Odoo (official image, from Git)
                           │     ├── Syncs → Moodle (official image, from Git)
@@ -101,10 +92,12 @@ GitHub Actions (CI/CD)
 │  │  ┌─── gke-subnet (10.0.1.0/24) ── PRIVATE ───────────────────────────┐   │   │
 │  │  │  Pods: 10.10.0.0/16    Services: 10.20.0.0/16                     │   │   │
 │  │  │                                                                   │   │   │
-│  │  │  ┌─── NGINX Ingress Controller (LoadBalancer — 1 public IP) ───┐  │   │   │
-│  │  │  │  odoo.esmos.dev       → routes to Odoo (PUBLIC)             │  │   │   │
-│  │  │  │  helpdesk.esmos.dev   → routes to osTicket (PUBLIC)         │  │   │   │
-│  │  │  └─────────────────────────────────────────────────────────────┘  │   │   │
+│  │  │  ┌─── NGINX Ingress (LoadBalancer IP #1) ──────────────────────┐  │   │   │
+│  │  │  │  http://INGRESS_IP  → routes to Odoo (PUBLIC)              │  │   │   │
+│  │  │  └────────────────────────────────────────────────────────────┘  │   │   │
+│  │  │  ┌─── osTicket LoadBalancer (IP #2) ──────────────────────────┐  │   │   │
+│  │  │  │  http://OSTICKET_IP → routes to osTicket (PUBLIC)          │  │   │   │
+│  │  │  └────────────────────────────────────────────────────────────┘  │   │   │
 │  │  │         │                                                         │   │   │
 │  │  │         ▼                                                         │   │   │
 │  │  │  ┌─── GKE Node 1 (e2-medium: 2 vCPU, 4GB) ── No Public IP ───┐  │   │   │
@@ -157,7 +150,8 @@ GitHub Actions (CI/CD)
 │  │  └───────────────────────────────────────────────────────────────────┘   │   │
 │  │                                                                          │   │
 │  │  ┌─── Access ───────────────────────────────────────────────────────┐   │   │
-│  │  │  Odoo + osTicket: PUBLIC via NGINX Ingress (1 LoadBalancer IP)   │   │   │
+│  │  │  Odoo: PUBLIC via NGINX Ingress (LoadBalancer IP #1)              │   │   │
+│  │  │  osTicket: PUBLIC via LoadBalancer (IP #2)                       │   │   │
 │  │  │  Moodle: INTERNAL only (kubectl port-forward)                    │   │   │
 │  │  │  Grafana/ArgoCD: INTERNAL only (kubectl port-forward)            │   │   │
 │  │  │  Cloud NAT: outbound internet for private nodes (image pulls)    │   │   │
@@ -282,8 +276,8 @@ Node 1              Node 1                          Node 1              Node 2  
 | 2nd-3rd node (autoscaled, part-time) | 2 vCPU, 4GB each | ~$5-25 |
 | Cloud SQL db-f1-micro | Shared vCPU, 614MB | ~$8 |
 | Storage (PVs + backups) | ~30GB total | ~$3 |
-| NGINX Ingress LoadBalancer | 1 public IP | ~$18 |
-| **Total (est.)** | | **~$60-80/month** |
+| LoadBalancers (Odoo Ingress + osTicket) | 2 public IPs | ~$36 |
+| **Total (est.)** | | **~$75-95/month** |
 
 > Shutdown policy: Scale node pool to 0 or delete cluster when not in use. Redeploy via GitHub Actions in minutes.
 
@@ -368,22 +362,19 @@ Update `kubernetes/odoo/deployment.yaml` → set `HOST` env var to the Cloud SQL
 
 ### Step 7: Access services
 
-**Public services** (via Ingress — get the public IP first):
+**Public services** (accessible from any browser):
 
 ```bash
-# Get the Ingress public IP
+# Get Odoo public IP
 kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-```
 
-Add to your `hosts` file (`C:\Windows\System32\drivers\etc\hosts`):
-```
-INGRESS_IP  odoo.esmos.dev
-INGRESS_IP  helpdesk.esmos.dev
+# Get osTicket public IP
+kubectl get svc -n osticket osticket -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
 
 Then open in browser:
-- **Odoo** → `http://odoo.esmos.dev`
-- **osTicket** → `http://helpdesk.esmos.dev`
+- **Odoo** → `http://ODOO_IP`
+- **osTicket** → `http://OSTICKET_IP`
 
 **Internal services** (via port-forward, each in its own terminal):
 

@@ -9,8 +9,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: odoo.esmos.dev
-      http:
+    - http:
         paths:
           - path: /
             pathType: Prefix
@@ -19,24 +18,3 @@ spec:
                 name: odoo
                 port:
                   number: 8069
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: osticket-ingress
-  namespace: osticket
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: helpdesk.esmos.dev
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: osticket
-                port:
-                  number: 8080
