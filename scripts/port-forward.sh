@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-ADDRESS="${1:-192.168.0.37}"
+ADDRESS="${1:-127.0.0.1}"
 
 PIDS=()
 
@@ -10,7 +10,7 @@ cleanup() {
   local pid
   for pid in "${PIDS[@]:-}"; do
     if kill -0 "$pid" 2>/dev/null; then
-      kill "$pid" 2>/devOoo/null || true
+      kill "$pid" 2>/dev/null || true
     fi
   done
 }
@@ -29,9 +29,7 @@ start_forward() {
   PIDS+=("$!")
 }
 
-start_forward "odoo" "odoo" "8069" "8069"
 start_forward "moodle" "moodle" "8888" "8888"
-start_forward "osticket" "osticket" "8080" "8080"
 start_forward "monitoring" "monitoring-grafana" "3000" "80"
 
 echo "Forwarding argocd/argocd-server: https://localhost:8443"
@@ -40,9 +38,7 @@ PIDS+=("$!")
 
 echo
 echo "Active forwards:"
-echo "  Odoo:    http://localhost:8069"
 echo "  Moodle:  http://localhost:8888"
-echo "  osTicket:http://localhost:8080"
 echo "  Grafana: http://localhost:3000"
 echo "  ArgoCD:  https://localhost:8443"
 echo
