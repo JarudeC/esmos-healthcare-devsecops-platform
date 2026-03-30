@@ -79,7 +79,7 @@ resource "google_compute_firewall" "deny_internet_ingress" {
 
   source_ranges = ["0.0.0.0/0"]
   target_tags   = ["gke-node"]
-  priority      = 1000
+  priority      = 2000
 }
 
 # Firewall: allow internal traffic
