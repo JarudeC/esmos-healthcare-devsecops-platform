@@ -94,20 +94,20 @@ resource "helm_release" "prometheus_stack" {
   skip_crds        = true
   disable_webhooks = true
 
-  # Budget-friendly: reduce resource usage
+  # Budget-friendly: increased slightly to stop OOMKilled loops
   set {
     name  = "prometheus.prometheusSpec.resources.requests.memory"
-    value = "256Mi"
+    value = "512Mi"  # Increased from 256Mi
   }
 
   set {
     name  = "prometheus.prometheusSpec.resources.limits.memory"
-    value = "512Mi"
+    value = "1024Mi" # Increased from 512Mi - This is the critical fix
   }
 
   set {
     name  = "prometheus.prometheusSpec.retention"
-    value = "3d"
+    value = "1d"      # Reduced retention to 1 day to save RAM usage
   }
 
   set {
