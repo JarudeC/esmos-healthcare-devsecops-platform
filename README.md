@@ -263,8 +263,8 @@ Node 1              Node 1                          Node 1              Node 2  
 | Metric | Target | How |
 |--------|--------|-----|
 | **Uptime SLA** | 99.5% | Kubernetes self-healing (auto-restart on crash, ~30s recovery) |
-| **RTO** (Recovery Time Objective) | < 5 min | Pod restart: ~30s. Node failure: ~2-3 min (autoscaler provisions new node) |
-| **RPO** (Recovery Point Objective) | 12 hours | Cloud SQL daily backup (Odoo). MariaDB CronJob every 12h to GCS (Moodle, osTicket) |
+| **RTO** (Recovery Time Objective) | 1 hour | Pod restart: ~30s. Node failure: ~2-3 min (autoscaler provisions new node) |
+| **RPO** (Recovery Point Objective) | 24 hours | Cloud SQL daily backup (Odoo). MariaDB CronJob every 12h to GCS (Moodle, osTicket) |
 | **Scaling** | 50 concurrent Moodle users | HPA: 1→3 pods at 70% CPU. GKE: 1→3 nodes. |
 
 ### Cost Optimization
