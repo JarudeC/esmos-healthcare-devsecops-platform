@@ -69,7 +69,7 @@ persistence:
 service:
   type: ClusterIP
   ports:
-    http: 8080
+    http: 8888
     https: 8443
 
 ## ---------- Ingress (Internal Only with IP Whitelisting) ----------

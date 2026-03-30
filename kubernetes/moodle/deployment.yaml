@@ -31,6 +31,11 @@ metadata:
     app: mariadb
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
   selector:
     matchLabels:
       app: mariadb
@@ -46,13 +51,19 @@ spec:
             - containerPort: 3306
           env:
             - name: MARIADB_ROOT_PASSWORD
-              value: "esmos-mariadb-root"
+              valueFrom:
+                secretKeyRef:
+                  name: moodle-mariadb
+                  key: mariadb-root-password
             - name: MARIADB_DATABASE
               value: "moodle"
             - name: MARIADB_USER
               value: "moodle"
             - name: MARIADB_PASSWORD
-              value: "esmos-moodle-db"
+              valueFrom:
+                secretKeyRef:
+                  name: moodle-mariadb
+                  key: mariadb-password
           resources:
             requests:
               cpu: 100m
@@ -111,28 +122,63 @@ spec:
             - name: MOODLE_DOCKER_DBNAME
               value: "moodle"
             - name: MOODLE_DOCKER_DBUSER
-              value: "root"
+              value: "moodle"
             - name: MOODLE_DOCKER_DBPASS
-              value: "esmos-mariadb-root"
+              valueFrom:
+                secretKeyRef:
+                  name: moodle-mariadb
+                  key: mariadb-password
             - name: APACHE_DOCUMENT_ROOT
               value: "/var/www/html"
           command: ["/bin/bash", "-c"]
           args:
             - |
-              apt-get update && apt-get install -y git
+              set -e
+              apt-get update && apt-get install -y git mariadb-client
               cd /var/www/html
-              if [ ! -f config.php ]; then
+              if [ ! -f version.php ]; then
                 git clone --depth 1 --branch MOODLE_405_STABLE https://github.com/moodle/moodle.git .
-                mkdir -p /var/www/moodledata
-                chmod 777 /var/www/moodledata
+              fi
+              mkdir -p /var/www/moodledata
+              chmod 777 /var/www/moodledata
+
+              if mariadb -h"$MOODLE_DOCKER_DBHOST" -u"$MOODLE_DOCKER_DBUSER" -p"$MOODLE_DOCKER_DBPASS" \
+                -D "$MOODLE_DOCKER_DBNAME" -Nse "SHOW TABLES LIKE 'mdl_config'" | grep -q '^mdl_config$'; then
+                cat > /var/www/html/config.php <<EOF
+              <?php
+              unset(\$CFG);
+              global \$CFG;
+              \$CFG = new stdClass();
+              \$CFG->dbtype = 'mariadb';
+              \$CFG->dblibrary = 'native';
+              \$CFG->dbhost = '${MOODLE_DOCKER_DBHOST}';
+              \$CFG->dbname = '${MOODLE_DOCKER_DBNAME}';
+              \$CFG->dbuser = '${MOODLE_DOCKER_DBUSER}';
+              \$CFG->dbpass = '${MOODLE_DOCKER_DBPASS}';
+              \$CFG->prefix = 'mdl_';
+              \$CFG->dboptions = array (
+                'dbpersist' => 0,
+                'dbport' => '',
+                'dbsocket' => '',
+                'dbcollation' => 'utf8mb4_unicode_ci',
+              );
+              \$CFG->wwwroot = 'http://localhost:8888';
+              \$CFG->dataroot = '/var/www/moodledata';
+              \$CFG->admin = 'admin';
+              \$CFG->directorypermissions = 02777;
+              \$CFG->sslproxy = false;
+
+              require_once(__DIR__ . '/lib/setup.php');
+              EOF
+              else
                 php admin/cli/install.php \
-                  --wwwroot=http://localhost:8080 \
+                  --wwwroot=http://localhost:8888 \
                   --dataroot=/var/www/moodledata \
                   --dbtype=mariadb \
                   --dbhost=mariadb \
                   --dbname=moodle \
-                  --dbuser=root \
-                  --dbpass=esmos-mariadb-root \
+                  --dbuser="$MOODLE_DOCKER_DBUSER" \
+                  --dbpass="$MOODLE_DOCKER_DBPASS" \
                   --fullname="ESMOS Healthcare Training" \
                   --shortname="ESMOS" \
                   --adminuser=admin \
@@ -141,7 +187,7 @@ spec:
                   --non-interactive \
                   --agree-license
                 echo "\$CFG->sslproxy = false;" >> /var/www/html/config.php
-                sed -i "s|'wwwroot'.*|'wwwroot'   => 'http://localhost:8080',|" /var/www/html/config.php
+                sed -i "s|'wwwroot'.*|'wwwroot'   => 'http://localhost:8888',|" /var/www/html/config.php
               fi
               chown -R www-data:www-data /var/www/html /var/www/moodledata
               apache2ctl -D FOREGROUND
@@ -177,7 +223,7 @@ spec:
   selector:
     app: moodle
   ports:
-    - port: 8080
+    - port: 8888
       targetPort: 80
 # ---
 # apiVersion: autoscaling/v2

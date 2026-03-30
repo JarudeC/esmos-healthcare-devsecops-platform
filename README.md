@@ -4,12 +4,18 @@ A Service Management platform for Healthcare, deploying **Odoo** (ERP/Operations
 
 ## Quick Start (For Team Members)
 
-The platform is already deployed. To access the services:
+The platform is already deployed. **Odoo** and **osTicket** are publicly accessible. **Moodle** is internal only.
 
-### Option A: Direct Access (requires gcloud + kubectl)
+### Public Services (no setup needed)
 
-> Your Google account must be granted access to the GCP project first. Ask the project admin to run:
-> `gcloud projects add-iam-policy-binding esmos-healthcare --member="user:YOUR_EMAIL" --role="roles/container.developer"`
+Open in your browser:
+- **Odoo** → `http://INGRESS_IP` (get IP: `kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'`)
+- **osTicket Helpdesk** → `http://OSTICKET_IP` (get IP: `kubectl get svc -n osticket osticket -o jsonpath='{.status.loadBalancer.ingress[0].ip}'`)
+
+### Internal Services (requires gcloud + kubectl)
+
+Moodle and monitoring tools are internal only. Your Google account must be granted access first. Ask the project admin to run:
+`gcloud projects add-iam-policy-binding esmos-healthcare --member="user:YOUR_EMAIL" --role="roles/container.developer"`
 
 1. **Install tools** (one-time):
    - [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`winget install Google.CloudSDK` on Windows)
@@ -21,42 +27,29 @@ The platform is already deployed. To access the services:
    gcloud container clusters get-credentials esmos-healthcare-gke --zone asia-southeast1-a --project esmos-healthcare
    ```
 
-3. **Access services** (each command in its own terminal):
+3. **Access internal services** (each command in its own terminal):
    ```bash
-   # Odoo → http://localhost:8069
-   kubectl port-forward svc/odoo -n odoo 8069:8069
-
-   # Moodle → http://localhost:8080 (admin / esmos-admin)
-   kubectl port-forward svc/moodle -n moodle 8080:8080
+   # Moodle → http://localhost:8888 (admin / esmos-admin)
+   kubectl port-forward svc/moodle -n moodle 8888:8888
 
    # Grafana → http://localhost:3000 (admin / esmos-admin)
    kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
-
-   # osTicket Helpdesk → http://localhost:8888
-   kubectl port-forward svc/osticket -n osticket 8888:8888
 
    # ArgoCD → https://localhost:8443
    kubectl port-forward svc/argocd-server -n argocd 8443:443
    ```
 
-### Option B: Shared Access via Hotspot (no tools needed for other devices)
+### Option: Shared Access via Hotspot (for Moodle demo)
 
-This simulates a private corporate network. One person (the host) runs the port-forward commands, and everyone else on the same network accesses the services via the host's IP.
+For sharing Moodle access without everyone installing tools:
 
 1. **Host** connects to a mobile hotspot (or any shared WiFi)
-2. **Host** finds their IP: run `ipconfig` on Windows, look for the WiFi adapter's IPv4 address (e.g. `192.168.x.x`)
-3. **Host** runs port-forward with `--address 0.0.0.0` (each in its own terminal):
+2. **Host** finds their IP: run `ipconfig` on Windows (e.g. `192.168.x.x`)
+3. **Host** runs port-forward with `--address 0.0.0.0`:
    ```bash
-   kubectl port-forward svc/odoo -n odoo 8069:8069 --address 0.0.0.0
-   kubectl port-forward svc/moodle -n moodle 8080:8080 --address 0.0.0.0
-   kubectl port-forward svc/osticket -n osticket 8888:8888 --address 0.0.0.0
-   kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80 --address 0.0.0.0
+   kubectl port-forward svc/moodle -n moodle 8888:8888 --address 0.0.0.0
    ```
-4. **Other devices** connect to the same hotspot/WiFi and open:
-   - Odoo → `http://192.168.x.x:8069`
-   - Moodle → `http://192.168.x.x:8080`
-   - osTicket → `http://192.168.x.x:8888`
-   - Grafana → `http://192.168.x.x:3000`
+4. **Other devices** on the same network open: `http://192.168.x.x:8888`
 
 > All services share the same backend — any changes you make are visible to everyone.
 
@@ -73,6 +66,7 @@ GitHub Actions (CI/CD)
                           ├── GKE Cluster (1-3 nodes, e2-medium, private)
                           ├── Cloud SQL PostgreSQL (private IP, daily backups)
                           ├── VPC (subnets: gke, db + private service access, Cloud NAT)
+                          ├── NGINX Ingress (public IP → Odoo) + osTicket LoadBalancer
                           ├── ArgoCD (GitOps controller)
                           │     ├── Syncs → Odoo (official image, from Git)
                           │     ├── Syncs → Moodle (official image, from Git)
@@ -89,7 +83,7 @@ GitHub Actions (CI/CD)
 │  ┌─── GCS Bucket (outside VPC) ─────────────────────────────────────────────┐   │
 │  │  gs://esmos-healthcare-tfstate                                           │   │
 │  │  ├── terraform/state/      (Terraform state)                             │   │
-│  │  ├── moodle-backups/       (12-hourly MariaDB dumps, 7-day retention)     │   │
+│  │  ├── moodle-backups/       (12-hourly MariaDB dumps, 7-day retention)    │   │
 │  │  └── osticket-backups/     (12-hourly MariaDB dumps, 7-day retention)    │   │
 │  └──────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                 │
@@ -98,19 +92,27 @@ GitHub Actions (CI/CD)
 │  │  ┌─── gke-subnet (10.0.1.0/24) ── PRIVATE ───────────────────────────┐   │   │
 │  │  │  Pods: 10.10.0.0/16    Services: 10.20.0.0/16                     │   │   │
 │  │  │                                                                   │   │   │
+│  │  │  ┌─── NGINX Ingress (LoadBalancer IP #1) ──────────────────────┐  │   │   │
+│  │  │  │  http://INGRESS_IP  → routes to Odoo (PUBLIC)               │  │   │   │
+│  │  │  └─────────────────────────────────────────────────────────────┘  │   │   │
+│  │  │  ┌─── osTicket LoadBalancer (IP #2) ──────────────────────────┐   │   │   │
+│  │  │  │  http://OSTICKET_IP → routes to osTicket (PUBLIC)          │   │   │   │
+│  │  │  └────────────────────────────────────────────────────────────┘   │   │   │
+│  │  │         │                                                         │   │   │
+│  │  │         ▼                                                         │   │   │
 │  │  │  ┌─── GKE Node 1 (e2-medium: 2 vCPU, 4GB) ── No Public IP ─────┐  │   │   │
 │  │  │  │                                                             │  │   │   │
 │  │  │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │  │   │   │
 │  │  │  │  │ Odoo Pod     │  │ Moodle Pod   │  │ osTicket Pod     │   │  │   │   │
-│  │  │  │  │ (1 replica)  │  │ (1 replica)  │  │ (Helpdesk)       │   │  │   │   │
-│  │  │  │  │ Port: 8069   │  │ Port: 8080   │  │ Port: 8888       │   │  │   │   │
-│  │  │  │  └──────┬───────┘  └──────┬───────┘  └──────┬───────────┘   │  │   │   │
+│  │  │  │  │ (PUBLIC)     │  │ (INTERNAL)   │  │ (PUBLIC)         │   │  │   │   │
+│  │  │  │  │ Port: 8069   │  │ Port: 8888   │  │ Port: 8080       │   │  │   │   │
+│  │  │  │  └──────┬───────┘  └──────┬───────┘  └───────┬──────────┘   │  │   │   │
 │  │  │  │         │                 │                  │              │  │   │   │
-│  │  │  │         │          ┌──────┴───────┐  ┌───────┴──────────┐   │  │   │   │
-│  │  │  │         │          │ MariaDB Pod  │  │ MariaDB Pod      │   │  │   │   │
-│  │  │  │         │          │ (Moodle DB)  │  │ (osTicket DB)    │   │  │   │   │
-│  │  │  │         │          │ → GCS backup │  │ → GCS backup     │   │  │   │   │
-│  │  │  │         │          └──────────────┘  └──────────────────┘   │  │   │   │
+│  │  │  │         │          ┌──────┴───────┐  ┌───────┴─────────┐    │  │   │   │
+│  │  │  │         │          │ MariaDB Pod  │  │ MariaDB Pod     │    │  │   │   │
+│  │  │  │         │          │ (Moodle DB)  │  │ (osTicket DB)   │    │  │   │   │
+│  │  │  │         │          │ → GCS backup │  │ → GCS backup    │    │  │   │   │
+│  │  │  │         │          └──────────────┘  └─────────────────┘    │  │   │   │
 │  │  │  │         │                                                   │  │   │   │
 │  │  │  │         └──→ connects to Cloud SQL (db-subnet below)        │  │   │   │
 │  │  │  │                                                             │  │   │   │
@@ -147,9 +149,11 @@ GitHub Actions (CI/CD)
 │  │  │  ALLOW  all internal traffic from 10.0.0.0/8          (pri 900)   │   │   │
 │  │  └───────────────────────────────────────────────────────────────────┘   │   │
 │  │                                                                          │   │
-│  │  ┌─── Access (No public endpoint) ───────────────────────────────────┐   │   │
-│  │  │  All services use ClusterIP (internal only)                       │   │   │
-│  │  │  Access method: kubectl port-forward from authorized machine      │   │   │
+│  │  ┌─── Access ────────────────────────────────────────────────────────┐   │   │
+│  │  │  Odoo: PUBLIC via NGINX Ingress (LoadBalancer IP #1)              │   │   │
+│  │  │  osTicket: PUBLIC via LoadBalancer (IP #2)                        │   │   │
+│  │  │  Moodle: INTERNAL only (kubectl port-forward)                     │   │   │
+│  │  │  Grafana/ArgoCD: INTERNAL only (kubectl port-forward)             │   │   │
 │  │  │  Cloud NAT: outbound internet for private nodes (image pulls)     │   │   │
 │  │  └───────────────────────────────────────────────────────────────────┘   │   │
 │  └──────────────────────────────────────────────────────────────────────────┘   │
@@ -204,6 +208,7 @@ Node 1              Node 1                          Node 1              Node 2  
 │   ├── db.tf                             # Cloud SQL for PostgreSQL
 │   └── helm.tf                           # ArgoCD, Prometheus/Grafana, App CRDs
 └── kubernetes/
+    ├── ingress.yaml                     # NGINX Ingress routes (Odoo + osTicket public)
     ├── odoo/
     │   ├── deployment.yaml              # Odoo Deployment, Service, PVCs (official image)
     │   └── argocd-odoo-app.yaml         # ArgoCD Application CRD for Odoo
@@ -223,10 +228,10 @@ Node 1              Node 1                          Node 1              Node 2  
 
 | System | Purpose | Users | Access |
 |--------|---------|-------|--------|
-| **Odoo** | Meal plan inventory & operations | Operations staff (post-training) | Internal, authenticated |
-| **osTicket** | Centralized helpdesk across Odoo & Moodle | Support managers, all staff | Internal, role-based |
-| **Moodle** | Mandatory compliance training (500+ staff) | All healthcare staff | Internal only, port-forward access |
-| **Grafana** | Live monitoring dashboard | SRE / operations team | Internal, port-forwarded |
+| **Odoo** | Meal plan inventory & operations | Operations staff (post-training) | Public via Ingress (`odoo.esmos.dev`) |
+| **osTicket** | Centralized helpdesk across Odoo & Moodle | Support managers, all staff | Public via Ingress (`helpdesk.esmos.dev`) |
+| **Moodle** | Mandatory compliance training (500+ staff) | All healthcare staff | Internal only (port-forward) |
+| **Grafana** | Live monitoring dashboard | SRE / operations team | Internal only (port-forward) |
 
 ### Service Integration Workflow
 
@@ -258,8 +263,8 @@ Node 1              Node 1                          Node 1              Node 2  
 | Metric | Target | How |
 |--------|--------|-----|
 | **Uptime SLA** | 99.5% | Kubernetes self-healing (auto-restart on crash, ~30s recovery) |
-| **RTO** (Recovery Time Objective) | < 5 min | Pod restart: ~30s. Node failure: ~2-3 min (autoscaler provisions new node) |
-| **RPO** (Recovery Point Objective) | 12 hours | Cloud SQL daily backup (Odoo). MariaDB CronJob every 12h to GCS (Moodle, osTicket) |
+| **RTO** (Recovery Time Objective) | 1 hour | Pod restart: ~30s. Node failure: ~2-3 min (autoscaler provisions new node) |
+| **RPO** (Recovery Point Objective) | 24 hours | Cloud SQL daily backup (Odoo). MariaDB CronJob every 12h to GCS (Moodle, osTicket) |
 | **Scaling** | 50 concurrent Moodle users | HPA: 1→3 pods at 70% CPU. GKE: 1→3 nodes. |
 
 ### Cost Optimization
@@ -271,7 +276,8 @@ Node 1              Node 1                          Node 1              Node 2  
 | 2nd-3rd node (autoscaled, part-time) | 2 vCPU, 4GB each | ~$5-25 |
 | Cloud SQL db-f1-micro | Shared vCPU, 614MB | ~$8 |
 | Storage (PVs + backups) | ~30GB total | ~$3 |
-| **Total (est.)** | | **~$40-60/month** |
+| LoadBalancers (Odoo Ingress + osTicket) | 2 public IPs | ~$36 |
+| **Total (est.)** | | **~$75-95/month** |
 
 > Shutdown policy: Scale node pool to 0 or delete cluster when not in use. Redeploy via GitHub Actions in minutes.
 
@@ -356,17 +362,25 @@ Update `kubernetes/odoo/deployment.yaml` → set `HOST` env var to the Cloud SQL
 
 ### Step 7: Access services
 
-Each command needs its own terminal:
+**Public services** (accessible from any browser):
 
 ```bash
-# Odoo → http://localhost:8069
-kubectl port-forward svc/odoo -n odoo 8069:8069
+# Get Odoo public IP
+kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 
-# Moodle → http://localhost:8080 (admin / esmos-admin)
-kubectl port-forward svc/moodle -n moodle 8080:8080
+# Get osTicket public IP
+kubectl get svc -n osticket osticket -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+```
 
-# osTicket Helpdesk → http://localhost:8888
-kubectl port-forward svc/osticket -n osticket 8888:8888
+Then open in browser:
+- **Odoo** → `http://ODOO_IP`
+- **osTicket** → `http://OSTICKET_IP`
+
+**Internal services** (via port-forward, each in its own terminal):
+
+```bash
+# Moodle → http://localhost:8888 (admin / esmos-admin)
+kubectl port-forward svc/moodle -n moodle 8888:8888
 
 # Grafana → http://localhost:3000 (admin / esmos-admin)
 kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
@@ -384,7 +398,7 @@ kubectl port-forward svc/argocd-server -n argocd 8443:443
 
 ### Step 9: Set up osTicket Helpdesk
 
-1. Access osTicket at http://localhost:8888
+1. Access osTicket at http://localhost:8080
 2. Complete the web-based setup wizard
 3. Configure departments, help topics, and SLA plans
 4. Add links to Moodle and Odoo in the helpdesk knowledge base
@@ -452,7 +466,7 @@ You can also teardown from GitHub without the CLI:
 | **Data residency** | All resources in `asia-southeast1` (Singapore) |
 | **Network isolation** | GKE private nodes, firewall deny-all internet inbound |
 | **Database security** | Cloud SQL private IP only, no public access |
-| **Access control** | No public endpoints; access via `kubectl port-forward` from authorized machines only. Odoo access requires training completion |
+| **Access control** | Odoo + osTicket public via Ingress (authenticated login). Moodle internal only (port-forward). Odoo access requires training completion |
 | **Least privilege** | Pod security contexts enforced, minimal resource requests |
 | **CI/CD auth** | Workload Identity Federation — no stored credentials, OIDC-based |
 | **Backups** | Cloud SQL daily (Odoo), CronJob every 12h to GCS (Moodle, osTicket), 7-day retention |

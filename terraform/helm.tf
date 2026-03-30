@@ -50,12 +50,12 @@ resource "helm_release" "argocd" {
   # Resource limits for e2-medium nodes
   set {
     name  = "controller.resources.requests.memory"
-    value = "128Mi"
+    value = "256Mi"
   }
 
   set {
     name  = "controller.resources.limits.memory"
-    value = "256Mi"
+    value = "512Mi"
   }
 
   set {
@@ -154,11 +154,50 @@ resource "helm_release" "prometheus_stack" {
 }
 
 # ─────────────────────────────────────────────────
+# NGINX Ingress Controller - Single LoadBalancer for public services
+# ─────────────────────────────────────────────────
+resource "helm_release" "nginx_ingress" {
+  name             = "ingress-nginx"
+  repository       = "https://kubernetes.github.io/ingress-nginx"
+  chart            = "ingress-nginx"
+  version          = "4.9.0"
+  namespace        = "ingress-nginx"
+  create_namespace = true
+  wait             = false
+  timeout          = 600
+
+  set {
+    name  = "controller.resources.requests.cpu"
+    value = "50m"
+  }
+
+  set {
+    name  = "controller.resources.requests.memory"
+    value = "128Mi"
+  }
+
+  set {
+    name  = "controller.resources.limits.cpu"
+    value = "250m"
+  }
+
+  set {
+    name  = "controller.resources.limits.memory"
+    value = "256Mi"
+  }
+
+  set {
+    name  = "controller.service.type"
+    value = "LoadBalancer"
+  }
+}
+
+# ─────────────────────────────────────────────────
 # ArgoCD Application CRDs - applied via kubectl
 # (kubernetes_manifest fails at plan time when cluster doesn't exist yet)
 # ─────────────────────────────────────────────────
 resource "null_resource" "argocd_apps" {
-  depends_on = [helm_release.argocd]
+  depends_on = [helm_release.argocd, helm_release.nginx_ingress]
 
   provisioner "local-exec" {
     command = <<-EOT
@@ -167,6 +206,8 @@ resource "null_resource" "argocd_apps" {
         --project ${var.project_id}
       kubectl apply -f ${path.module}/../kubernetes/odoo/argocd-odoo-app.yaml
       kubectl apply -f ${path.module}/../kubernetes/moodle/argocd-moodle-app.yaml
+      kubectl apply -f ${path.module}/../kubernetes/osticket/argocd-osticket-app.yaml
+      kubectl apply -f ${path.module}/../kubernetes/ingress.yaml
     EOT
   }
 }
